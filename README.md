@@ -1,6 +1,6 @@
-# Tool Scraper - AI-Powered Tool Discovery Platform
+# Tool Scraper - AI-Powered Tool Discovery Agent
 
-**Tool Scraper** is an intelligent AI-powered platform that helps developers discover, analyze, and compare developer tools, frameworks, and technologies. Built with a modern React frontend and FastAPI backend, it uses OpenAI GPT-4 and advanced web scraping to provide comprehensive tool insights in real-time.
+**Tool Scraper** is an intelligent AI-powered agent that helps developers discover, analyze, and compare developer tools, frameworks, and technologies. Built with a modern React frontend and FastAPI backend, it uses OpenAI GPT-4 and advanced web scraping to provide comprehensive tool insights in real-time.
 
 ---
 
