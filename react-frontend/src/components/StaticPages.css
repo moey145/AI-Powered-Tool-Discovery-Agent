@@ -1,0 +1,80 @@
+.static-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 5.5rem 1rem 4rem; /* add extra top padding for fixed navbar */
+}
+
+.back-home {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.back-home:hover {
+  text-decoration: underline;
+}
+
+.static-header h1 {
+  font-size: 2rem;
+  margin: 0 0 1.5rem 0;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.static-section {
+  margin-top: 1.5rem;
+}
+
+.static-section h2 {
+  font-size: 1.5rem;
+  margin: 2rem 0 0.75rem 0;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.static-section h2:first-of-type {
+  margin-top: 0;
+}
+
+.static-section p {
+  line-height: 1.7;
+  margin-bottom: 1rem;
+  color: #334155;
+}
+
+.static-section ul {
+  margin-bottom: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+.static-section li {
+  line-height: 1.7;
+  margin-bottom: 0.5rem;
+  color: #334155;
+}
+
+.static-link {
+  margin-left: 0.3rem;
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.static-link:hover {
+  text-decoration: underline;
+}
+
+/* Dark mode adjustments */
+.dark .static-section h2 {
+  color: #f1f5f9;
+}
+
+.dark .static-section p,
+.dark .static-section li {
+  color: #cbd5e1;
+}

@@ -1,0 +1,150 @@
+.company-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 400px;
+}
+
+.company-card:hover {
+  box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+}
+
+.company-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.company-header h4 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 1.2rem;
+}
+
+.website-link {
+  color: #667eea;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.website-link:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.company-description {
+  color: #64748b;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.company-metrics {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.metric-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.metric-badge.pricing {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.metric-badge.open-source {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.metric-badge.proprietary {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.metric-badge.api-yes {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.metric-badge.api-no {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.company-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.detail-section h5 {
+  margin: 0 0 0.5rem 0;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tag {
+  background: #e5e7eb;
+  color: #374151;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.tag.more {
+  background: #667eea;
+  color: white;
+}
+
+/* Dark mode styles */
+.dark .company-card {
+  background: #0f172a;
+  border-color: #475569;
+}
+
+.dark .company-card:hover {
+  background: #1e293b;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dark .company-header h4 {
+  color: #ffffff;
+}
+
+.dark .company-description {
+  color: #cbd5e1;
+}
+
+.dark .detail-section h5 {
+  color: #e2e8f0;
+}
+
+.dark .website-link {
+  color: #60a5fa;
+}
+
+.dark .website-link:hover {
+  background: rgba(96, 165, 250, 0.1);
+}
+

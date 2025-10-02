@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toast Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button.success {
+            background: #28a745;
+        }
+        .test-button.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .test-button.error {
+            background: #dc3545;
+        }
+        .test-button.info {
+            background: #17a2b8;
+        }
+        .description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+    </style>
+    <link rel="stylesheet" href="src/components/Toast.css">
+</head>
+<body>
+    <h1>🍞 Toast Notification Test</h1>
+    <p>Test the toast notification system that's now integrated into the AI Research Agent:</p>
+
+    <div class="test-section">
+        <h3>Basic Toast Types</h3>
+        <div class="description">Click buttons to show different types of toast notifications:</div>
+        <button class="test-button success" onclick="showToast('Operation completed successfully!', 'success')">
+            Success Toast
+        </button>
+        <button class="test-button warning" onclick="showToast('Please check your input', 'warning')">
+            Warning Toast
+        </button>
+        <button class="test-button error" onclick="showToast('Something went wrong!', 'error')">
+            Error Toast
+        </button>
+        <button class="test-button info" onclick="showToast('Here is some information', 'info')">
+            Info Toast
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h3>Validation Error Examples</h3>
+        <div class="description">These are the actual validation messages users will see:</div>
+        <button class="test-button warning" onclick="showToast('Query must be at least 2 characters long', 'warning')">
+            Too Short Query
+        </button>
+        <button class="test-button warning" onclick="showToast('Query must be less than 200 characters', 'warning')">
+            Too Long Query
+        </button>
+        <button class="test-button error" onclick="showToast('Query contains potentially dangerous content', 'error')">
+            XSS Attempt
+        </button>
+        <button class="test-button error" onclick="showToast('Query contains potentially dangerous SQL content', 'error')">
+            SQL Injection
+        </button>
+        <button class="test-button warning" onclick="showToast('Query contains too many special characters', 'warning')">
+            Special Characters
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h3>Multiple Toasts</h3>
+        <div class="description">Test stacking multiple toasts:</div>
+        <button class="test-button" onclick="showMultipleToasts()">
+            Show Multiple Toasts
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h3>Long Duration Toast</h3>
+        <div class="description">Toast that stays longer (10 seconds):</div>
+        <button class="test-button info" onclick="showToast('This toast will stay for 10 seconds', 'info', 10000)">
+            Long Duration Toast
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h3>Persistent Toast</h3>
+        <div class="description">Toast that doesn't auto-dismiss (click X to close):</div>
+        <button class="test-button warning" onclick="showToast('This toast requires manual dismissal', 'warning', 0)">
+            Persistent Toast
+        </button>
+    </div>
+
+    <script>
+        // Simple toast implementation for testing
+        let toastId = 0;
+        const toasts = [];
+
+        function showToast(message, type = 'error', duration = 5000) {
+            const id = ++toastId;
+            const toast = createToast(id, message, type, duration);
+            document.body.appendChild(toast);
+            toasts.push({ id, element: toast });
+            
+            // Auto-remove after duration
+            if (duration > 0) {
+                setTimeout(() => {
+                    removeToast(id);
+                }, duration);
+            }
+        }
+
+        function createToast(id, message, type, duration) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-content">
+                    <div class="toast-icon">${getIcon(type)}</div>
+                    <div class="toast-body">
+                        <div class="toast-title">${getTitle(type)}</div>
+                        <div class="toast-message">${message}</div>
+                    </div>
+                    <button class="toast-close" onclick="removeToast(${id})" aria-label="Close notification">×</button>
+                </div>
+                ${duration > 0 ? `<div class="toast-progress">
+                    <div class="toast-progress-bar" style="animation-duration: ${duration}ms;"></div>
+                </div>` : ''}
+            `;
+            return toast;
+        }
+
+        function removeToast(id) {
+            const toastIndex = toasts.findIndex(t => t.id === id);
+            if (toastIndex !== -1) {
+                const toast = toasts[toastIndex];
+                toast.element.classList.add('exiting');
+                setTimeout(() => {
+                    if (toast.element.parentNode) {
+                        toast.element.parentNode.removeChild(toast.element);
+                    }
+                    toasts.splice(toastIndex, 1);
+                }, 300);
+            }
+        }
+
+        function getIcon(type) {
+            switch (type) {
+                case 'success': return '✅';
+                case 'warning': return '⚠️';
+                case 'info': return 'ℹ️';
+                case 'error':
+                default: return '❌';
+            }
+        }
+
+        function getTitle(type) {
+            switch (type) {
+                case 'success': return 'Success';
+                case 'warning': return 'Warning';
+                case 'info': return 'Info';
+                case 'error':
+                default: return 'Error';
+            }
+        }
+
+        function showMultipleToasts() {
+            showToast('First toast', 'info', 3000);
+            setTimeout(() => showToast('Second toast', 'warning', 3000), 500);
+            setTimeout(() => showToast('Third toast', 'success', 3000), 1000);
+            setTimeout(() => showToast('Fourth toast', 'error', 3000), 1500);
+        }
+
+        // Initialize with a welcome message
+        setTimeout(() => {
+            showToast('Welcome! Click the buttons above to test different toast types.', 'info', 5000);
+        }, 500);
+    </script>
+</body>
+</html>

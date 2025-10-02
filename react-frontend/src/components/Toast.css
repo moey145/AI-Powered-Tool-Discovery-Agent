@@ -1,0 +1,264 @@
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  min-width: 320px;
+  max-width: 500px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  animation: slideInRight 0.3s ease-out;
+  overflow: hidden;
+  border-left: 4px solid;
+}
+
+.toast.exiting {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.toast-content {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.toast-message {
+  font-size: 13px;
+  line-height: 1.4;
+  color: #6b7280;
+  word-wrap: break-word;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #374151;
+}
+
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.toast-progress-bar {
+  height: 100%;
+  background-color: currentColor;
+  animation: progressBar linear forwards;
+  transform-origin: left;
+}
+
+@keyframes progressBar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Toast types */
+.toast.error {
+  border-left-color: #ef4444;
+  color: #dc2626;
+}
+
+.toast.error .toast-title {
+  color: #dc2626;
+}
+
+.toast.error .toast-message {
+  color: #7f1d1d;
+}
+
+.toast.warning {
+  border-left-color: #f59e0b;
+  color: #d97706;
+}
+
+.toast.warning .toast-title {
+  color: #d97706;
+}
+
+.toast.warning .toast-message {
+  color: #92400e;
+}
+
+.toast.success {
+  border-left-color: #10b981;
+  color: #059669;
+}
+
+.toast.success .toast-title {
+  color: #059669;
+}
+
+.toast.success .toast-message {
+  color: #047857;
+}
+
+.toast.info {
+  border-left-color: #3b82f6;
+  color: #2563eb;
+}
+
+.toast.info .toast-title {
+  color: #2563eb;
+}
+
+.toast.info .toast-message {
+  color: #1d4ed8;
+}
+
+/* Dark theme support */
+.dark .toast {
+  background: #1f2937;
+  color: #f9fafb;
+}
+
+.dark .toast-message {
+  color: #d1d5db;
+}
+
+.dark .toast-close {
+  color: #9ca3af;
+}
+
+.dark .toast-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #f3f4f6;
+}
+
+.dark .toast-progress {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .toast.error .toast-message {
+  color: #fca5a5;
+}
+
+.dark .toast.warning .toast-message {
+  color: #fbbf24;
+}
+
+.dark .toast.success .toast-message {
+  color: #6ee7b7;
+}
+
+.dark .toast.info .toast-message {
+  color: #93c5fd;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .toast-content {
+    padding: 12px;
+  }
+  
+  .toast-title {
+    font-size: 13px;
+  }
+  
+  .toast-message {
+    font-size: 12px;
+  }
+}
+
+/* Stack multiple toasts */
+.toast + .toast {
+  top: calc(20px + 80px);
+}
+
+.toast + .toast + .toast {
+  top: calc(20px + 160px);
+}
+
+.toast + .toast + .toast + .toast {
+  top: calc(20px + 240px);
+}
+
+@media (max-width: 640px) {
+  .toast + .toast {
+    top: calc(10px + 70px);
+  }
+  
+  .toast + .toast + .toast {
+    top: calc(10px + 140px);
+  }
+  
+  .toast + .toast + .toast + .toast {
+    top: calc(10px + 210px);
+  }
+}
