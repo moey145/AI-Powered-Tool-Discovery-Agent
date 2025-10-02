@@ -130,3 +130,5 @@ temp/
 *.pfx
 secrets/
 credentials/
+.env 
+*.env 
