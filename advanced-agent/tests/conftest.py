@@ -64,16 +64,18 @@ class FakeSearch:
     def __init__(self, article="Redux and Zustand and Vue.js are popular.", tool_hits=None):
         self.article = article
         self.tool_hits = tool_hits
+        self.tool_queries: list[str] = []
 
     async def search(self, query, limit):
         if self.article is None:
             return []
         if query.startswith("best "):
             return [SearchHit("https://blog.example.com/best", "Best tools", self.article)]
+        self.tool_queries.append(query)
         if self.tool_hits is not None:
             return self.tool_hits
-        name = query.removesuffix(" official site pricing")
-        slug = name.lower().replace(" ", "")
+        name = query.split(" ", 1)[0]
+        slug = name.lower()
         return [SearchHit(f"https://{slug}.dev/docs", name, f"{name} docs")]
 
 

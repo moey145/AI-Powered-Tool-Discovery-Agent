@@ -28,7 +28,8 @@ ANALYSIS_SYSTEM = f"""You extract facts about one developer tool from web pages.
 Rules:
 - Use only what the sources state. Use Unknown, null, or an empty list for anything else.
 - pricing_model: Free means no paid plans; Freemium means a free tier plus paid plans;
-  Paid means no free tier; Enterprise means sales-led contracts only.
+  Paid means no free tier; Enterprise means sales-led contracts only. If the sources show
+  the tool is open source and mention no paid plans, use Free.
 - website: the tool's official site, and only if its URL appears in the sources.
 - Keep each list to the five most important entries."""
 

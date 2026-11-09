@@ -101,7 +101,8 @@ def official_score(name: str, url: str) -> int:
     if any(host == domain or host.endswith(f".{domain}") for domain in _NON_OFFICIAL_DOMAINS):
         return -1
     slug = _slug(name)
-    if slug and slug in _slug(host):
+    # Compare the start of each domain label so "Flask" doesn't match hydroflask.com.
+    if slug and any(_slug(label).startswith(slug) for label in host.split(".")):
         return 3
     if host == "github.com" and slug in _slug(parts.path):
         return 2
@@ -113,7 +114,11 @@ def matches_pricing(company: CompanyInfo, preference: PricingPreference) -> bool
     if preference == "any" or company.pricing_model is PricingModel.UNKNOWN:
         return True
     if preference == "free":
-        return company.pricing_model is PricingModel.FREE or company.is_open_source is True
+        # A free tier is usable for free, and the result still shows it as Freemium.
+        return (
+            company.pricing_model in {PricingModel.FREE, PricingModel.FREEMIUM}
+            or company.is_open_source is True
+        )
     if preference == "freemium":
         return company.pricing_model is PricingModel.FREEMIUM
     return company.pricing_model in {
@@ -226,7 +231,7 @@ class Workflow:
         write = get_stream_writer()
         query = state["query"]
         write(_progress("searching", "Searching the web", 5))
-        hits = await self.search.search(f"best {query} developer tools comparison", 8)
+        hits = await self.search.search(f"best {query}", 8)
         if not hits:
             return {"tools": []}
 
@@ -263,7 +268,7 @@ class Workflow:
         async def research_one(name: str) -> tuple[str, CompanyInfo | None]:
             async with semaphore:
                 try:
-                    return name, await self._research_tool(name)
+                    return name, await self._research_tool(name, state["query"])
                 except Exception:
                     logger.warning("Research failed for %s", name, exc_info=True)
                     return name, None
@@ -288,8 +293,9 @@ class Workflow:
         unresearched = [name for name in tools if not results.get(name)]
         return {"companies": companies, "unresearched": unresearched}
 
-    async def _research_tool(self, name: str) -> CompanyInfo | None:
-        hits = await self.search.search(f"{name} official site pricing", 5)
+    async def _research_tool(self, name: str, query: str) -> CompanyInfo | None:
+        # The user's query disambiguates names like Flask, Rocket, or Echo.
+        hits = await self.search.search(f"{name} {query} official site pricing", 5)
         if not hits:
             return None
         ranked = sorted(hits, key=lambda hit: official_score(name, hit.url), reverse=True)

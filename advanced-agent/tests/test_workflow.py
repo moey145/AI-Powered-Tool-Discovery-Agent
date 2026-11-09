@@ -20,6 +20,13 @@ async def test_returns_researched_tools_and_recommendation(settings):
     assert result.companies[0].sources == ["https://redux.dev/docs"]
 
 
+async def test_tool_searches_include_the_users_query_for_context(settings):
+    search = FakeSearch()
+    workflow, _ = build(settings, search=search)
+    await workflow.run("react state")
+    assert "Redux react state official site pricing" in search.tool_queries
+
+
 async def test_drops_tools_not_named_in_the_sources(settings):
     workflow, _ = build(settings, FakeLLM(tools=["Redux", "Zustand Pro"]))
     result = await workflow.run("react state")
@@ -161,6 +168,8 @@ def test_is_grounded(name, text, expected):
         ("Redux", "https://github.com/reduxjs/redux", 2),
         ("Redux", "https://en.wikipedia.org/wiki/Redux", -1),
         ("Redux", "https://example.com/a", 0),
+        ("Flask", "https://www.hydroflask.com", 0),
+        ("Flask", "https://flask.palletsprojects.com/en/stable/", 3),
     ],
 )
 def test_official_score(name, url, expected):
@@ -171,6 +180,7 @@ def test_official_score(name, url, expected):
     ("pricing", "open_source", "preference", "expected"),
     [
         (PricingModel.FREE, None, "free", True),
+        (PricingModel.FREEMIUM, False, "free", True),
         (PricingModel.PAID, True, "free", True),
         (PricingModel.PAID, False, "free", False),
         (PricingModel.FREEMIUM, False, "paid", True),
