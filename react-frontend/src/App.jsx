@@ -25,7 +25,6 @@ function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Use custom hook for search functionality (no local storage)
   const {
     loading,
     loadingProgress,
@@ -35,33 +34,12 @@ function App() {
     handleSearch,
   } = useSearch();
 
-  // Clear error state when query changes (no need to show toast here since SearchSection handles it)
-  useEffect(() => {
-    if (error) {
-      setError(null);
-    }
-  }, [query, setError]);
-
-  // Handle search with error handling
   const onSearch = async () => {
-    try {
-      const searchResults = await handleSearch(query);
-      if (searchResults) {
-        setResults(searchResults);
-      }
-    } catch (error) {
-      // Error is already handled by the useSearch hook and stored in error state
-      // No need to show alert since ErrorDisplay component will show the error
-      console.error("Search error:", error);
+    const searchResults = await handleSearch(query);
+    if (searchResults) {
+      setResults(searchResults);
     }
   };
-
-  // Clear error when query changes
-  useEffect(() => {
-    if (error) {
-      setError(null);
-    }
-  }, [query, setError]);
 
   const scrollToSelector = (selector, offset) => {
     const el = document.querySelector(selector);
@@ -93,6 +71,13 @@ function App() {
     }
   };
 
+  const handleGetStarted = () => {
+    scrollToSelector("#search-section", -100);
+    setTimeout(() => {
+      document.querySelector('input[type="text"]')?.focus();
+    }, 100);
+  };
+
   // Simple client-side navigation for footer links
   const renderRoute = () => {
     if (route === "/privacy") return <Privacy />;
@@ -100,7 +85,7 @@ function App() {
 
     return (
       <>
-        <Hero onGetStarted={handleGetStarted} onWatchDemo={handleWatchDemo} />
+        <Hero onGetStarted={handleGetStarted} />
         <Features />
         <section id="search-section">
           <SearchSection
@@ -121,29 +106,6 @@ function App() {
         </section>
       </>
     );
-  };
-
-  // Hero button handlers
-  const handleGetStarted = () => {
-    const searchSection = document.querySelector("#search-section");
-    if (searchSection) {
-      const yOffset = -100;
-      const y =
-        searchSection.getBoundingClientRect().top +
-        window.pageYOffset +
-        yOffset;
-      window.scrollTo({ top: y, behavior: "smooth" });
-      setTimeout(() => {
-        const searchInput = document.querySelector('input[type="text"]');
-        if (searchInput) {
-          searchInput.focus();
-        }
-      }, 100);
-    }
-  };
-
-  const handleWatchDemo = () => {
-    alert("Demo video coming soon! 🎥");
   };
 
   return (

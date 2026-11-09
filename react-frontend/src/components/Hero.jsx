@@ -1,7 +1,7 @@
 import React from "react";
 import "./Hero.css";
 
-const Hero = ({ onGetStarted, onWatchDemo }) => {
+const Hero = ({ onGetStarted }) => {
   const scrollToFeatures = () => {
     const featuresSection = document.querySelector(".features-section");
     if (featuresSection) {

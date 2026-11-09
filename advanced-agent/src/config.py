@@ -1,46 +1,44 @@
-from pydantic_settings import BaseSettings
-from typing import Optional
-import os
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    # API Keys
-    openai_api_key: str
-    google_custom_search_api_key: Optional[str] = None
-    google_search_engine_id: Optional[str] = None
-    
-    # Search Configuration
-    search_provider: str = "auto"  # "google_custom_search", "duckduckgo", "auto"
-    max_search_results: int = 6
-    search_variants_limit: int = 4
-    
-    # Scraping Configuration
-    max_concurrent_scrapes: int = 5  # Increased concurrency
-    scrape_timeout: int = 15  # Reduced timeout for faster failures
-    max_content_length: int = 8000
-    min_content_length: int = 100
-    
-    # Retry Configuration
-    max_retries: int = 3
-    failure_threshold: int = 3
-    recovery_timeout: int = 60
-    
-    # API Timeouts
-    google_custom_search_timeout: int = 15
-    
-    class Config:
-        env_file = ".env"
-        env_prefix = ""
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-# Global settings instance
-settings = Settings()
+    openai_api_key: SecretStr
+    openai_model: str = "gpt-6-luna"
 
-# Validate required settings
-if not settings.openai_api_key:
-    raise ValueError("OPENAI_API_KEY is required")
+    search_provider: Literal["auto", "brave", "google_custom_search", "duckduckgo"] = "auto"
+    brave_search_api_key: SecretStr | None = None
+    google_custom_search_api_key: SecretStr | None = None
+    google_search_engine_id: str | None = None
 
-# Validate Google Custom Search if it's the primary provider
-if settings.search_provider == "google_custom_search":
-    if not settings.google_custom_search_api_key:
-        raise ValueError("GOOGLE_CUSTOM_SEARCH_API_KEY is required when search_provider is 'google_custom_search'")
-    if not settings.google_search_engine_id:
-        raise ValueError("GOOGLE_SEARCH_ENGINE_ID is required when search_provider is 'google_custom_search'")
+    max_tools: int = 6
+    max_concurrent_research: int = 4
+    max_page_chars: int = 6000
+    max_page_bytes: int = 2_000_000
+    min_page_chars: int = 200
+
+    http_timeout: float = 10.0
+    llm_timeout: float = 25.0
+    research_timeout: float = 40.0
+    total_timeout: float = 90.0
+    cache_ttl_seconds: int = 3600
+
+    user_agent: str = "ToolDiscoveryAgent/2.0"
+
+    allowed_origins: str = "http://localhost:5173"
+    rate_limit_per_minute: int = 5
+    daily_search_budget: int = 200
+
+    @property
+    def origins(self) -> list[str]:
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

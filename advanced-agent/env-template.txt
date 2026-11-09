@@ -1,0 +1,16 @@
+# Copy this file to .env and fill in your actual API keys
+
+# OpenAI API Configuration (REQUIRED)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Google Custom Search Configuration (Optional - for enhanced search capabilities)
+# GOOGLE_CUSTOM_SEARCH_API_KEY=your_google_custom_search_api_key_here
+# GOOGLE_SEARCH_ENGINE_ID=your_google_search_engine_id_here
+
+# Search Provider Configuration
+SEARCH_PROVIDER=auto
+
+# Performance Configuration
+MAX_SEARCH_RESULTS=6
+MAX_CONCURRENT_SCRAPES=5
+SCRAPE_TIMEOUT=15

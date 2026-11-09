@@ -1,0 +1,8 @@
+*
+!advanced-agent/pyproject.toml
+!advanced-agent/uv.lock
+!advanced-agent/api.py
+!advanced-agent/main.py
+!advanced-agent/src
+**/__pycache__
+**/.env*

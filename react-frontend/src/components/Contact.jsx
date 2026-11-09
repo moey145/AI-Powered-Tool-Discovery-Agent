@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import emailjs from "@emailjs/browser";
+import { useTheme } from "../contexts/useTheme";
 
 import "./Contact.css";
 
@@ -13,34 +14,11 @@ const Contact = () => {
   });
 
   const [loading, setLoading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { isDarkMode } = useTheme();
 
   // Initialize EmailJS
   useEffect(() => {
     emailjs.init("O4KLgYM0Xwo4YjNHk"); // Your EmailJS user ID
-  }, []);
-
-  // Detect theme changes
-  useEffect(() => {
-    const checkTheme = () => {
-      const isDark =
-        document.documentElement.classList.contains("dark") ||
-        document.body.classList.contains("dark");
-      setIsDarkMode(isDark);
-    };
-
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
   }, []);
 
   const handleChange = (e) => {
@@ -96,7 +74,7 @@ const Contact = () => {
           theme: isDarkMode ? "dark" : "light",
         });
       }
-    } catch (error) {
+    } catch {
       setLoading(false);
       toast.error("Ahh, something went wrong. Please try again.", {
         position: "top-right",

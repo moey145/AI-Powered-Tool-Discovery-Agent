@@ -1,90 +1,85 @@
-from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, validator
-from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Literal, TypedDict
 
-class PricingModel(str, Enum):
+from pydantic import BaseModel, Field, field_validator
+
+PricingPreference = Literal["any", "free", "freemium", "paid"]
+ResearchStatus = Literal["success", "partial", "no_results"]
+
+
+class PricingModel(StrEnum):
     FREE = "Free"
     FREEMIUM = "Freemium"
     PAID = "Paid"
     ENTERPRISE = "Enterprise"
     UNKNOWN = "Unknown"
 
-class OpenSourceStatus(str, Enum):
-    OPEN_SOURCE = "Open Source"
-    PROPRIETARY = "Proprietary"
-    UNKNOWN = "Unknown"
 
-class CompanyAnalysis(BaseModel):
-    name: Optional[str] = Field(None, description="Company/tool name")
-    description: Optional[str] = Field(None, description="Brief description")
-    website: Optional[str] = Field(None, description="Official website")
-    pricing_model: Optional[PricingModel] = Field(None, description="Pricing model")
-    is_open_source: Optional[bool] = Field(None, description="Open source status")
-    tech_stack: List[str] = Field(default_factory=list, description="Supported technologies")
-    api_available: Optional[bool] = Field(None, description="API availability")
-    language_support: List[str] = Field(default_factory=list, description="Supported languages")
-    integration_capabilities: List[str] = Field(default_factory=list, description="Integration options")
-    
-    @validator('website')
-    def validate_website(cls, v):
-        if v and not v.startswith(('http://', 'https://')):
-            return f"https://{v}"
-        return v
+# LLM output schemas. Every field is required (nullable where the answer can be unknown)
+# because OpenAI's strict structured output does not accept default values.
+class ToolDiscovery(BaseModel):
+    tools: list[str] = Field(description="Names of specific products named in the sources")
+    pricing_preference: PricingPreference = Field(
+        description="Pricing the user asked for, or 'any' if they did not ask"
+    )
+
+
+class ToolAnalysis(BaseModel):
+    description: str = Field(description="One or two factual sentences on what the tool does")
+    website: str | None = Field(description="Official website, only if present in the sources")
+    pricing_model: PricingModel = Field(description="Use Unknown unless the sources say")
+    is_open_source: bool | None = Field(description="Null unless the sources say")
+    api_available: bool | None = Field(description="Null unless the sources say")
+    tech_stack: list[str]
+    language_support: list[str]
+    integration_capabilities: list[str]
+
 
 class CompanyInfo(BaseModel):
-    name: str = Field(..., description="Company/tool name")
-    description: str = Field(..., description="Description")
-    website: str = Field(..., description="Website URL")
-    pricing_model: Optional[PricingModel] = Field(None, description="Pricing model")
-    is_open_source: Optional[bool] = Field(None, description="Open source status")
-    tech_stack: List[str] = Field(default_factory=list, description="Technology stack")
-    competitors: List[str] = Field(default_factory=list, description="Competitors")
-    api_available: Optional[bool] = Field(None, description="API availability")
-    language_support: List[str] = Field(default_factory=list, description="Language support")
-    integration_capabilities: List[str] = Field(default_factory=list, description="Integrations")
-    developer_experience_rating: Optional[str] = Field(None, description="Developer experience rating")
-    
-    # Enhanced metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    created_at: datetime = Field(default_factory=datetime.now, description="Analysis timestamp")
-    confidence_score: Optional[float] = Field(None, ge=0, le=1, description="Analysis confidence")
-    
-    @validator('website')
-    def validate_website(cls, v):
-        if v and not v.startswith(('http://', 'https://')):
-            return f"https://{v}"
-        return v
+    name: str
+    description: str
+    website: str | None = None
+    pricing_model: PricingModel = PricingModel.UNKNOWN
+    is_open_source: bool | None = None
+    api_available: bool | None = None
+    tech_stack: list[str] = Field(default_factory=list)
+    language_support: list[str] = Field(default_factory=list)
+    integration_capabilities: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
 
-class ResearchState(BaseModel):
-    query: str = Field(..., description="Original search query")
-    extracted_tools: List[str] = Field(default_factory=list, description="Extracted tool names")
-    companies: List[CompanyInfo] = Field(default_factory=list, description="Analyzed companies")
-    search_results: List[Dict[str, Any]] = Field(default_factory=list, description="Raw search results")
-    analysis: Optional[str] = Field(None, description="Final analysis")
-    
-    # Enhanced tracking
-    workflow_stages: List[str] = Field(default_factory=list, description="Completed workflow stages")
-    errors: List[str] = Field(default_factory=list, description="Errors encountered")
-    processing_time: Optional[float] = Field(None, description="Total processing time")
-    
-    @validator('query')
-    def validate_query(cls, v):
-        if not v or len(v.strip()) < 2:
+
+class ResearchResult(BaseModel):
+    query: str
+    companies: list[CompanyInfo] = Field(default_factory=list)
+    analysis: str | None = None
+    status: ResearchStatus = "success"
+    unresearched: list[str] = Field(default_factory=list)
+    pricing_preference: PricingPreference = "any"
+
+
+class ResearchState(TypedDict, total=False):
+    query: str
+    tools: list[str]
+    pricing_preference: PricingPreference
+    companies: list[CompanyInfo]
+    unresearched: list[str]
+    analysis: str | None
+
+
+class ResearchRequest(BaseModel):
+    query: str
+
+    @field_validator("query")
+    @classmethod
+    def clean_query(cls, value: str) -> str:
+        cleaned = " ".join("".join(ch for ch in value if ch.isprintable()).split())
+        if len(cleaned) < 2:
             raise ValueError("Query must be at least 2 characters long")
-        return v.strip()
+        if len(cleaned) > 200:
+            raise ValueError("Query must be 200 characters or fewer")
+        return cleaned
 
-class SearchResult(BaseModel):
-    """Enhanced search result model"""
-    url: str = Field(..., description="Result URL")
-    title: str = Field(..., description="Result title")
-    snippet: str = Field(..., description="Result snippet")
-    source: str = Field(..., description="Data source")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    relevance_score: Optional[float] = Field(None, ge=0, le=1, description="Relevance score")
-    
-    @validator('url')
-    def validate_url(cls, v):
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError("URL must start with http:// or https://")
-        return v
+
+class ResearchResponse(ResearchResult):
+    request_id: str
+    processing_time: float

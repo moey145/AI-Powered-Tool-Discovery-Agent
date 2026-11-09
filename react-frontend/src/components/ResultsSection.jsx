@@ -1,40 +1,53 @@
-import React, { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import CompanyCard from "./CompanyCard";
 import "./ResultsSection.css";
 
+// Model output is built from scraped pages, so it must stay text. Only **bold** is formatted.
+const renderBold = (text) =>
+  text.split(/\*\*(.+?)\*\*/g).map((part, index) =>
+    index % 2 === 1 ? (
+      <strong key={index}>{part}</strong>
+    ) : (
+      <Fragment key={index}>{part}</Fragment>
+    )
+  );
+
 const ResultsSection = ({ results }) => {
-  if (!results) return null;
-
-  // Debug logging
-
-  // Auto-scroll to results when component mounts
   useEffect(() => {
-    const scrollToResults = () => {
-      const resultsSection = document.querySelector(".results-section");
-      if (resultsSection) {
-        const yOffset = -80; // Adjust for navbar/padding
-        const y =
-          resultsSection.getBoundingClientRect().top +
-          window.pageYOffset +
-          yOffset;
+    if (!results) return undefined;
+    const timer = setTimeout(() => {
+      const section = document.querySelector(".results-section");
+      if (section) {
+        const y = section.getBoundingClientRect().top + window.scrollY - 80;
         window.scrollTo({ top: y, behavior: "smooth" });
       }
-    };
-
-    // Small delay to ensure the component is fully rendered
-    const timer = setTimeout(scrollToResults, 100);
+    }, 100);
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array means this runs once when component mounts
+  }, [results]);
+
+  if (!results) return null;
+
+  const { companies, analysis, status, unresearched = [] } = results;
+
+  if (status === "no_results" || companies.length === 0) {
+    return (
+      <div className="results-section">
+        <p className="results-note">
+          We couldn't find verifiable tools for that search. Try different
+          wording, or try again in a moment.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="results-section">
-      {/* Summary Metrics */}
       <div className="metrics-grid">
         <div className="metric-card">
           <div className="metric-icon">🏢</div>
           <div className="metric-content">
             <h3>Tools Found</h3>
-            <div className="metric-value">{results.companies.length}</div>
+            <div className="metric-value">{companies.length}</div>
           </div>
         </div>
         <div className="metric-card">
@@ -42,7 +55,7 @@ const ResultsSection = ({ results }) => {
           <div className="metric-content">
             <h3>Open Source</h3>
             <div className="metric-value">
-              {results.companies.filter((c) => c.is_open_source).length}
+              {companies.filter((c) => c.is_open_source).length}
             </div>
           </div>
         </div>
@@ -51,7 +64,7 @@ const ResultsSection = ({ results }) => {
           <div className="metric-content">
             <h3>With APIs</h3>
             <div className="metric-value">
-              {results.companies.filter((c) => c.api_available).length}
+              {companies.filter((c) => c.api_available).length}
             </div>
           </div>
         </div>
@@ -60,38 +73,33 @@ const ResultsSection = ({ results }) => {
           <div className="metric-content">
             <h3>Free Tools</h3>
             <div className="metric-value">
-              {
-                results.companies.filter((c) => c.pricing_model === "Free")
-                  .length
-              }
+              {companies.filter((c) => c.pricing_model === "Free").length}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Company Cards */}
       <div className="companies-section">
-        <h3>Detailed Tool Analysis ({results.companies.length} tools)</h3>
+        <h3>Detailed Tool Analysis ({companies.length} tools)</h3>
+        {unresearched.length > 0 && (
+          <p className="results-note">
+            Couldn't verify details for: {unresearched.join(", ")}.
+          </p>
+        )}
         <div className="companies-grid">
-          {results.companies.map((company, index) => (
-            <CompanyCard key={index} company={company} />
+          {companies.map((company) => (
+            <CompanyCard key={company.name} company={company} />
           ))}
         </div>
       </div>
 
-      {/* AI Recommendations */}
-      {results.analysis && (
+      {analysis && (
         <div className="recommendations-section">
           <h3>AI Recommendations</h3>
           <div className="recommendations-content">
-            <div
-              className="recommendation-text"
-              dangerouslySetInnerHTML={{
-                __html: results.analysis
-                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                  .replace(/\n/g, "<br />"),
-              }}
-            />
+            <div className="recommendation-text" style={{ whiteSpace: "pre-line" }}>
+              {renderBold(analysis)}
+            </div>
           </div>
         </div>
       )}

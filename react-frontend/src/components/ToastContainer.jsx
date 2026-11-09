@@ -4,6 +4,10 @@ import Toast from "./Toast";
 const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
 
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   // Add toast function - can be called from anywhere via context or props
   const addToast = useCallback((message, type = "error", duration = 5000) => {
     // Check if identical toast already exists (prevent duplicates)
@@ -28,11 +32,7 @@ const ToastContainer = () => {
 
       return [...prev, newToast];
     });
-  }, []);
-
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
+  }, [removeToast]);
 
   // Expose addToast globally for easy access
   React.useEffect(() => {

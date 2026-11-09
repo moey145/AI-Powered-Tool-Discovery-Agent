@@ -1,14 +1,26 @@
 import React from "react";
 import "./CompanyCard.css";
 
+const safeUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url : null;
+  } catch {
+    return null;
+  }
+};
+
 const CompanyCard = ({ company }) => {
+  const website = safeUrl(company.website);
+  const sources = (company.sources || []).map(safeUrl).filter(Boolean);
+
   return (
     <div className="company-card">
       <div className="company-header">
         <h4>{company.name || "Unknown Tool"}</h4>
-        {company.website && (
+        {website && (
           <a
-            href={company.website}
+            href={website.href}
             target="_blank"
             rel="noopener noreferrer"
             className="website-link"
@@ -27,7 +39,7 @@ const CompanyCard = ({ company }) => {
           💰 {company.pricing_model || "Unknown"}
         </span>
 
-        {company.is_open_source !== null && (
+        {company.is_open_source != null && (
           <span
             className={`metric-badge ${
               company.is_open_source ? "open-source" : "proprietary"
@@ -37,7 +49,7 @@ const CompanyCard = ({ company }) => {
           </span>
         )}
 
-        {company.api_available !== null && (
+        {company.api_available != null && (
           <span
             className={`metric-badge ${
               company.api_available ? "api-yes" : "api-no"
@@ -95,6 +107,25 @@ const CompanyCard = ({ company }) => {
               </div>
             </div>
           )}
+
+        {sources.length > 0 && (
+          <div className="detail-section">
+            <h5>📚 Sources</h5>
+            <div className="tags">
+              {sources.map((source) => (
+                <a
+                  key={source.href}
+                  href={source.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tag"
+                >
+                  {source.hostname.replace(/^www\./, "")}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

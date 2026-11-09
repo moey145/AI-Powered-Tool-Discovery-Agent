@@ -1,18 +1,9 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import "./Toast.css";
 
 const Toast = ({ message, type = "error", duration = 5000, onClose }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
-
-  useEffect(() => {
-    if (duration > 0) {
-      const timer = setTimeout(() => {
-        handleClose();
-      }, duration);
-      return () => clearTimeout(timer);
-    }
-  }, [duration]);
 
   const handleClose = () => {
     setIsExiting(true);
@@ -23,6 +14,14 @@ const Toast = ({ message, type = "error", duration = 5000, onClose }) => {
       }
     }, 300); // Match CSS transition duration
   };
+
+  const onTimeout = useEffectEvent(handleClose);
+
+  useEffect(() => {
+    if (duration <= 0) return undefined;
+    const timer = setTimeout(onTimeout, duration);
+    return () => clearTimeout(timer);
+  }, [duration]);
 
   if (!isVisible) return null;
 

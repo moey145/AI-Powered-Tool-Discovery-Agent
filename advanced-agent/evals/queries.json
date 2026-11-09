@@ -1,0 +1,10 @@
+[
+  {"query": "React state management libraries", "pricing": "any", "expect_any": ["Redux", "Zustand", "MobX", "Jotai", "XState", "Recoil"]},
+  {"query": "git commit hooks", "pricing": "any", "expect_any": ["Husky", "pre-commit", "Lefthook", "Overcommit"]},
+  {"query": "free error monitoring tools", "pricing": "free", "expect_any": ["Sentry", "GlitchTip", "Bugsink", "Highlight"]},
+  {"query": "apache kafka alternatives", "pricing": "any", "expect_any": ["Redpanda", "Pulsar", "RabbitMQ", "NATS"]},
+  {"query": "paid CI/CD platforms", "pricing": "paid", "expect_any": ["CircleCI", "TeamCity", "GitHub Actions", "Buildkite", "Harness"]},
+  {"query": "Python web frameworks", "pricing": "any", "expect_any": ["Django", "Flask", "FastAPI"]},
+  {"query": "C++ testing frameworks", "pricing": "any", "expect_any": ["GoogleTest", "Google Test", "Catch2", "doctest"]},
+  {"query": "Vue component libraries", "pricing": "any", "expect_any": ["Vuetify", "PrimeVue", "Quasar", "Element Plus", "Naive UI"]}
+]

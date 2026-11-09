@@ -19,6 +19,12 @@
 
 }
 
+.results-note {
+  margin: 1rem 0;
+  text-align: center;
+  opacity: 0.75;
+}
+
 @keyframes expandDown {
   from {
     opacity: 0;
