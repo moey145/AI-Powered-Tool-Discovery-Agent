@@ -57,6 +57,9 @@ def normalize_hits(hits: list[SearchHit], limit: int) -> list[SearchHit]:
 
 class SearchProvider(ABC):
     name: str
+    max_attempts = 2
+    retry_statuses = _RETRYABLE
+    retry_delay = 0.5
 
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
@@ -71,8 +74,10 @@ class SearchProvider(ABC):
     def _parse(self, response: httpx.Response) -> list[SearchHit]: ...
 
     async def search(self, query: str, limit: int) -> list[SearchHit]:
-        """Return hits, retrying once on a transient failure. Never raises for HTTP errors."""
-        for attempt in range(2):
+        """Return hits, retrying transient failures. Never raises for HTTP errors."""
+        for attempt in range(self.max_attempts):
+            if attempt:
+                await asyncio.sleep(self.retry_delay * attempt)
             try:
                 response = await self._request(query, limit)
             except httpx.HTTPError as exc:
@@ -82,10 +87,8 @@ class SearchProvider(ABC):
             if response.status_code == 200:
                 return self._parse(response)
             logger.warning("%s returned HTTP %s", self.name, response.status_code)
-            if response.status_code not in _RETRYABLE:
+            if response.status_code not in self.retry_statuses:
                 break
-            if attempt == 0:
-                await asyncio.sleep(0.5)
         return []
 
 
@@ -151,6 +154,10 @@ class DuckDuckGoSearchProvider(SearchProvider):
     """Keyless fallback using DuckDuckGo's HTML page."""
 
     name = "duckduckgo"
+    # DuckDuckGo answers 202 with no results when it wants clients to slow down.
+    max_attempts = 3
+    retry_statuses = _RETRYABLE | {202}
+    retry_delay = 1.5
 
     def is_available(self) -> bool:
         return True

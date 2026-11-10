@@ -48,6 +48,46 @@ async def test_duckduckgo_unwraps_redirects_and_skips_ads(settings):
     assert hits[0].snippet == "State container"
 
 
+async def test_duckduckgo_waits_and_retries_when_asked_to_slow_down(settings):
+    statuses = iter([202, 202, 200])
+
+    def handler(request):
+        status = next(statuses)
+        return httpx.Response(status, text=DDG_HTML if status == 200 else "")
+
+    async with mock_client(handler, settings) as client:
+        provider = DuckDuckGoSearchProvider(client)
+        provider.retry_delay = 0
+        hits = await provider.search("redux", 5)
+    assert len(hits) == 1
+
+
+async def test_duckduckgo_gives_up_after_three_attempts(settings):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(202, text="")
+
+    async with mock_client(handler, settings) as client:
+        provider = DuckDuckGoSearchProvider(client)
+        provider.retry_delay = 0
+        assert await provider.search("redux", 5) == []
+    assert len(calls) == 3
+
+
+async def test_other_providers_do_not_retry_202(settings):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(202, json={})
+
+    async with mock_client(handler, settings) as client:
+        assert await BraveSearchProvider(client, "key").search("redux", 5) == []
+    assert len(calls) == 1
+
+
 async def test_brave_parses_results_and_sends_key(settings):
     def handler(request):
         assert request.headers["X-Subscription-Token"] == "brave-key"
