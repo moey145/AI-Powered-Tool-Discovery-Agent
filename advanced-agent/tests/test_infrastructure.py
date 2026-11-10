@@ -1,12 +1,17 @@
 """Tests for search parsing, the network guard, scraping, and rate limiting."""
 
 import logging
+from datetime import UTC, datetime, timedelta
 
+import fakeredis
 import httpx
 import pytest
+from redis.exceptions import ConnectionError as RedisConnectionError
 
+from src.github import GitHubFacts, belongs_to_tool, maintenance_status, parse_repo, repo_path
+from src.models import CompanyInfo, ResearchResult
 from src.net import BlockedURLError, create_client, ensure_public
-from src.rate_limit import RateLimiter
+from src.rate_limit import RateLimiter, RedisRateLimiter
 from src.scraper import Scraper, extract_text
 from src.search_providers import (
     BraveSearchProvider,
@@ -16,6 +21,7 @@ from src.search_providers import (
     SearchManager,
     normalize_hits,
 )
+from src.store import RedisResultCache
 
 
 async def public_resolver(host: str) -> list[str]:
@@ -159,20 +165,179 @@ class Clock:
         return self.now
 
 
-def test_rate_limiter_blocks_per_client_then_recovers():
+async def test_rate_limiter_blocks_per_client_then_recovers():
     clock = Clock()
     limiter = RateLimiter(per_minute=2, daily_budget=100, clock=clock)
-    assert limiter.check("a") is None
-    assert limiter.check("a") is None
-    assert limiter.check("a") == 60
-    assert limiter.check("b") is None
+    assert await limiter.check("a") is None
+    assert await limiter.check("a") is None
+    assert await limiter.check("a") == 60
+    assert await limiter.check("b") is None
     clock.now += 61
-    assert limiter.check("a") is None
+    assert await limiter.check("a") is None
 
 
-def test_rate_limiter_enforces_daily_budget_across_clients():
+async def test_rate_limiter_enforces_daily_budget_across_clients():
     clock = Clock()
     limiter = RateLimiter(per_minute=10, daily_budget=2, clock=clock)
-    assert limiter.check("a") is None
-    assert limiter.check("b") is None
-    assert limiter.check("c") == 86_400
+    assert await limiter.check("a") is None
+    assert await limiter.check("b") is None
+    assert await limiter.check("c") == 86_400
+
+
+async def test_redis_rate_limiter_is_shared_between_instances():
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    clock = lambda: 1_000_000.0  # noqa: E731
+    first = RedisRateLimiter(redis, per_minute=2, daily_budget=100, clock=clock)
+    second = RedisRateLimiter(redis, per_minute=2, daily_budget=100, clock=clock)
+    assert await first.check("a") is None
+    assert await second.check("a") is None
+    assert await first.check("a") == 20
+
+
+async def test_redis_rate_limiter_enforces_daily_budget():
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    limiter = RedisRateLimiter(redis, 10, daily_budget=1, clock=lambda: 1_000_000.0)
+    assert await limiter.check("a") is None
+    assert await limiter.check("b") == 86_400 - 1_000_000 % 86_400
+
+
+class BrokenRedis:
+    async def incr(self, key):
+        raise RedisConnectionError("down")
+
+    async def get(self, key):
+        raise RedisConnectionError("down")
+
+    async def set(self, key, value, ex=None):
+        raise RedisConnectionError("down")
+
+
+async def test_rate_limits_still_apply_when_redis_is_down():
+    limiter = RedisRateLimiter(BrokenRedis(), per_minute=1, daily_budget=100)
+    assert await limiter.check("a") is None
+    assert await limiter.check("a") is not None
+
+
+async def test_redis_cache_round_trips_results():
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    cache = RedisResultCache(redis, 60)
+    result = ResearchResult(query="q", companies=[CompanyInfo(name="X", description="d")])
+    await cache.set("q", result)
+    assert await cache.get("q") == result
+    assert await cache.get("other") is None
+
+
+async def test_redis_cache_treats_outages_as_a_miss():
+    cache = RedisResultCache(BrokenRedis(), 60)
+    await cache.set("q", ResearchResult(query="q"))
+    assert await cache.get("q") is None
+
+
+def repo_json(**overrides):
+    values = {
+        "html_url": "https://github.com/pallets/flask",
+        "full_name": "pallets/flask",
+        "stargazers_count": 70000,
+        "license": {"spdx_id": "BSD-3-Clause"},
+        "pushed_at": "2026-10-01T00:00:00Z",
+        "archived": False,
+        "homepage": "https://flask.palletsprojects.com",
+    }
+    return {**values, **overrides}
+
+
+async def test_github_uses_a_known_repository_url(settings):
+    def handler(request):
+        assert request.url.path == "/repos/pallets/flask"
+        return httpx.Response(200, json=repo_json())
+
+    urls = ["https://github.com/pallets/flask", "https://flask.palletsprojects.com/en/stable/"]
+    async with mock_client(handler, settings) as client:
+        facts = await GitHubFacts(client).facts_for("Flask", urls)
+    assert facts.is_open_source and facts.license == "BSD-3-Clause" and facts.stars == 70000
+
+
+async def test_github_search_requires_an_exact_name_and_real_adoption(settings):
+    items = [
+        repo_json(full_name="someone/flask-extras", stargazers_count=90000),
+        repo_json(full_name="someone/flask", stargazers_count=12),
+        repo_json(),
+    ]
+
+    def handler(request):
+        assert request.url.path == "/search/repositories"
+        return httpx.Response(200, json={"items": items})
+
+    async with mock_client(handler, settings) as client:
+        facts = await GitHubFacts(client).facts_for("Flask", ["https://flask.palletsprojects.com"])
+    assert facts.url == "https://github.com/pallets/flask"
+
+
+async def test_github_rejects_a_same_named_repository_from_someone_else(settings):
+    impostor = repo_json(
+        full_name="wmww/Pinecone",
+        html_url="https://github.com/wmww/Pinecone",
+        homepage="http://pinecone-lang.herokuapp.com/",
+    )
+    handler = lambda request: httpx.Response(200, json={"items": [impostor]})  # noqa: E731
+    async with mock_client(handler, settings) as client:
+        assert await GitHubFacts(client).facts_for("Pinecone", ["https://www.pinecone.io"]) is None
+
+
+async def test_github_rejects_an_unrelated_repository_found_in_search_results(settings):
+    personal = repo_json(
+        full_name="vinijmoura/Azure-DevOps",
+        html_url="https://github.com/vinijmoura/Azure-DevOps",
+        homepage="",
+    )
+    handler = lambda request: httpx.Response(200, json=personal)  # noqa: E731
+    urls = ["https://github.com/vinijmoura/Azure-DevOps", "https://azure.microsoft.com/devops"]
+    async with mock_client(handler, settings) as client:
+        assert await GitHubFacts(client).facts_for("Azure DevOps", urls) is None
+
+
+@pytest.mark.parametrize(
+    ("tool", "full_name", "homepage", "urls", "expected"),
+    [
+        ("Jest", "jestjs/jest", "", [], True),
+        ("AWS CDK", "aws/aws-cdk", "", [], True),
+        ("Zustand", "pmndrs/zustand", "https://zustand-demo.pmnd.rs/", ["https://x.pmnd.rs"], True),
+        ("Pinecone", "wmww/Pinecone", "http://p.herokuapp.com", ["https://q.herokuapp.com"], False),
+        ("Overcommit", "sds/overcommit", "", ["https://github.com/sds/overcommit"], False),
+    ],
+)
+def test_belongs_to_tool(tool, full_name, homepage, urls, expected):
+    assert belongs_to_tool(tool, {"full_name": full_name, "homepage": homepage}, urls) is expected
+
+
+async def test_github_failures_return_nothing(settings):
+    handler = lambda request: httpx.Response(403, json={})  # noqa: E731
+    async with mock_client(handler, settings) as client:
+        assert await GitHubFacts(client).facts_for("Flask", []) is None
+
+
+def test_non_open_source_licenses_are_not_labelled_open_source():
+    facts = parse_repo(repo_json(license={"spdx_id": "NOASSERTION"}))
+    assert facts.is_open_source is False and facts.license is None
+
+
+@pytest.mark.parametrize(
+    ("days", "archived", "expected"),
+    [(10, False, "active"), (400, False, "slowing"), (1000, False, "stale"), (1, True, "archived")],
+)
+def test_maintenance_status(days, archived, expected):
+    now = datetime(2026, 11, 1, tzinfo=UTC)
+    assert maintenance_status(now - timedelta(days=days), archived, now) == expected
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://github.com/pallets/flask/tree/main", "pallets/flask"),
+        ("https://github.com/features/actions", None),
+        ("https://github.com/pallets", None),
+        ("https://gitlab.com/a/b", None),
+    ],
+)
+def test_repo_path(url, expected):
+    assert repo_path(url) == expected

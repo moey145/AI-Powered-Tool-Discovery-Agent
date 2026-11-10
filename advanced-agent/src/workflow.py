@@ -3,8 +3,9 @@
 import asyncio
 import re
 import time
-from collections import OrderedDict
 from collections.abc import AsyncIterator
+from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 from urllib.parse import urlparse
 
@@ -16,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
 from .config import Settings
+from .github import GitHubFacts, RepoFacts
 from .logger import get_logger
 from .models import (
     CompanyInfo,
@@ -29,6 +31,7 @@ from .models import (
 from .prompts import ANALYSIS_SYSTEM, DISCOVERY_SYSTEM, RECOMMENDATION_SYSTEM, format_sources
 from .scraper import Page, Scraper
 from .search_providers import SearchHit, SearchManager, create_search_manager
+from .store import RedisResultCache, ResultCache
 
 logger = get_logger("workflow")
 
@@ -37,6 +40,19 @@ Event = dict[str, Any]
 
 _ARTICLES_TO_READ = 3
 _PAGES_PER_TOOL = 2
+_MIN_TOOLS = 3
+_RETRY_PHRASING = "{query} top alternatives list"
+_UNREADABLE_DOMAINS = (
+    "reddit.com",
+    "facebook.com",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "youtube.com",
+    "instagram.com",
+    "quora.com",
+    "pinterest.com",
+)
 _NON_OFFICIAL_DOMAINS = (
     "wikipedia.org",
     "medium.com",
@@ -50,6 +66,23 @@ _NON_OFFICIAL_DOMAINS = (
     "stackoverflow.com",
     "alternativeto.net",
 )
+
+
+@dataclass
+class Usage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+
+_usage: ContextVar[Usage | None] = ContextVar("llm_usage", default=None)
+
+
+def _record_usage(message: Any) -> None:
+    usage = _usage.get()
+    metadata = getattr(message, "usage_metadata", None)
+    if usage is not None and metadata:
+        usage.input_tokens += metadata.get("input_tokens", 0)
+        usage.output_tokens += metadata.get("output_tokens", 0)
 
 
 class LLM(Protocol):
@@ -69,11 +102,16 @@ class OpenAILLM:
         )
 
     async def structured(self, schema: type[Schema], system: str, user: str) -> Schema:
-        model = self._chat.with_structured_output(schema)
-        return await model.ainvoke([SystemMessage(system), HumanMessage(user)])
+        model = self._chat.with_structured_output(schema, include_raw=True)
+        output = await model.ainvoke([SystemMessage(system), HumanMessage(user)])
+        _record_usage(output["raw"])
+        if output["parsed"] is None:
+            raise ValueError("The model returned no usable output")
+        return output["parsed"]
 
     async def text(self, system: str, user: str) -> str:
         response = await self._chat.ainvoke([SystemMessage(system), HumanMessage(user)])
+        _record_usage(response)
         content = response.content
         if isinstance(content, str):
             return content
@@ -132,40 +170,32 @@ def _host(url: str) -> str:
     return urlparse(url).netloc.lower().removeprefix("www.")
 
 
+def is_readable(url: str) -> bool:
+    """False for sites that usually block scraping or show only a login wall."""
+    host = _host(url)
+    return not any(host == domain or host.endswith(f".{domain}") for domain in _UNREADABLE_DOMAINS)
+
+
 def _progress(stage: str, message: str, percent: int, **extra: Any) -> Event:
     return {"type": "progress", "stage": stage, "message": message, "percent": percent, **extra}
 
 
-class ResultCache:
-    def __init__(self, ttl_seconds: int, max_entries: int = 128):
-        self.ttl = ttl_seconds
-        self.max_entries = max_entries
-        self._items: OrderedDict[str, tuple[float, ResearchResult]] = OrderedDict()
-
-    def get(self, key: str) -> ResearchResult | None:
-        item = self._items.get(key)
-        if item is None:
-            return None
-        if time.monotonic() - item[0] >= self.ttl:
-            del self._items[key]
-            return None
-        self._items.move_to_end(key)
-        return item[1]
-
-    def set(self, key: str, value: ResearchResult) -> None:
-        self._items[key] = (time.monotonic(), value)
-        self._items.move_to_end(key)
-        while len(self._items) > self.max_entries:
-            self._items.popitem(last=False)
-
-
 class Workflow:
-    def __init__(self, settings: Settings, llm: LLM, search: SearchManager, scraper: Scraper):
+    def __init__(
+        self,
+        settings: Settings,
+        llm: LLM,
+        search: SearchManager,
+        scraper: Scraper,
+        cache: ResultCache | RedisResultCache | None = None,
+        github: GitHubFacts | None = None,
+    ):
         self.settings = settings
         self.llm = llm
         self.search = search
         self.scraper = scraper
-        self.cache = ResultCache(settings.cache_ttl_seconds)
+        self.github = github
+        self.cache = cache or ResultCache(settings.cache_ttl_seconds)
         self.graph = self._build_graph()
 
     def _build_graph(self):
@@ -184,11 +214,15 @@ class Workflow:
     async def stream(self, query: str) -> AsyncIterator[Event]:
         """Yield progress events, then one final {"type": "result", "result": ...} event."""
         key = query.casefold()
-        cached = self.cache.get(key)
+        cached = await self.cache.get(key)
         if cached:
+            logger.info("Served from cache")
             yield {"type": "result", "result": cached}
             return
 
+        started = time.monotonic()
+        usage = Usage()
+        _usage.set(usage)
         state: ResearchState = {}
         inputs: ResearchState = {"query": query}
         async for mode, payload in self.graph.astream(inputs, stream_mode=["custom", "values"]):
@@ -198,8 +232,22 @@ class Workflow:
                 state = payload
 
         result = self._to_result(query, state)
+        cost = (
+            usage.input_tokens * self.settings.input_price_per_million
+            + usage.output_tokens * self.settings.output_price_per_million
+        ) / 1_000_000
+        logger.info(
+            "Search finished status=%s tools=%s input_tokens=%s output_tokens=%s "
+            "estimated_cost_usd=%.5f seconds=%.1f",
+            result.status,
+            len(result.companies),
+            usage.input_tokens,
+            usage.output_tokens,
+            cost,
+            time.monotonic() - started,
+        )
         if result.status == "success":
-            self.cache.set(key, result)
+            await self.cache.set(key, result)
         yield {"type": "result", "result": result}
 
     async def run(self, query: str) -> ResearchResult:
@@ -231,18 +279,35 @@ class Workflow:
         write = get_stream_writer()
         query = state["query"]
         write(_progress("searching", "Searching the web", 5))
-        hits = await self.search.search(f"best {query}", 8)
-        if not hits:
-            return {"tools": []}
+        tools, preference = await self._find_tools(query, f"best {query}", write)
+        if len(tools) < _MIN_TOOLS:
+            write(_progress("extracting", "Checking more sources", 20))
+            more, _ = await self._find_tools(query, _RETRY_PHRASING.format(query=query))
+            seen = {tool.casefold() for tool in tools}
+            tools += [tool for tool in more if tool.casefold() not in seen]
+        tools = tools[: self.settings.max_tools]
+        if tools:
+            write(_progress("researching", f"Found {len(tools)} tools", 25, tools=tools))
+        return {"tools": tools, "pricing_preference": preference}
 
-        write(_progress("reading", "Reading comparison articles", 12))
-        pages = await self.scraper.fetch_many([hit.url for hit in hits[:_ARTICLES_TO_READ]])
+    async def _find_tools(
+        self, query: str, search_query: str, write: Any = None
+    ) -> tuple[list[str], PricingPreference]:
+        hits = await self.search.search(search_query, 8)
+        if not hits:
+            return [], "any"
+
+        if write:
+            write(_progress("reading", "Reading comparison articles", 12))
+        readable = [hit.url for hit in hits if is_readable(hit.url)]
+        pages = await self.scraper.fetch_many(readable[:_ARTICLES_TO_READ])
 
         sections = [(hit.title or hit.url, hit.snippet) for hit in hits]
         sections += [(page.title or page.url, page.text) for page in pages]
         sources = format_sources(sections)
 
-        write(_progress("extracting", "Identifying relevant tools", 18))
+        if write:
+            write(_progress("extracting", "Identifying relevant tools", 18))
         system = DISCOVERY_SYSTEM.format(max_tools=self.settings.max_tools)
         discovery = await self.llm.structured(
             ToolDiscovery, system, f"Query: {query}\n\n{sources}"
@@ -256,9 +321,7 @@ class Workflow:
             if name and name.casefold() not in seen and is_grounded(name, corpus):
                 seen.add(name.casefold())
                 tools.append(name)
-        tools = tools[: self.settings.max_tools]
-        write(_progress("researching", f"Found {len(tools)} tools", 25, tools=tools))
-        return {"tools": tools, "pricing_preference": discovery.pricing_preference}
+        return tools, discovery.pricing_preference
 
     async def _research(self, state: ResearchState) -> ResearchState:
         write = get_stream_writer()
@@ -282,6 +345,8 @@ class Workflow:
                     results[name] = company
                     percent = 25 + round(60 * len(results) / len(tools))
                     write(_progress("researching", f"Researched {name}", percent, tool=name))
+                    if company:
+                        write({"type": "tool", "company": company.model_dump(mode="json")})
         except TimeoutError:
             logger.warning("Research hit its time limit with %s/%s done", len(results), len(tools))
         finally:
@@ -299,24 +364,72 @@ class Workflow:
         if not hits:
             return None
         ranked = sorted(hits, key=lambda hit: official_score(name, hit.url), reverse=True)
-        pages = await self.scraper.fetch_many([hit.url for hit in ranked[:_PAGES_PER_TOOL]])
+        readable = [hit.url for hit in ranked if is_readable(hit.url)][:_PAGES_PER_TOOL]
+        urls = readable + self._pricing_page(name, ranked, readable)
+        pages, facts = await asyncio.gather(
+            self.scraper.fetch_many(urls),
+            self._repo_facts(name, [hit.url for hit in hits]),
+        )
         sections = [(hit.url, f"{hit.title}. {hit.snippet}") for hit in hits]
         sections += [(page.url, page.text) for page in pages]
         analysis = await self.llm.structured(
             ToolAnalysis, ANALYSIS_SYSTEM, f"Tool: {name}\n\n{format_sources(sections)}"
         )
-        return CompanyInfo(
+        website = self._choose_website(name, analysis.website, ranked, pages)
+        sources = [page.url for page in pages] or [hit.url for hit in ranked[:_PAGES_PER_TOOL]]
+        company = CompanyInfo(
             name=name,
             description=analysis.description,
-            website=self._choose_website(name, analysis.website, ranked, pages),
+            website=website,
             pricing_model=analysis.pricing_model,
             is_open_source=analysis.is_open_source,
             api_available=analysis.api_available,
             tech_stack=analysis.tech_stack[:5],
             language_support=analysis.language_support[:5],
             integration_capabilities=analysis.integration_capabilities[:5],
-            sources=[page.url for page in pages] or [hit.url for hit in ranked[:_PAGES_PER_TOOL]],
+            sources=sources,
         )
+        return self._apply_repo_facts(company, facts)
+
+    @staticmethod
+    def _pricing_page(name: str, ranked: list[SearchHit], already: list[str]) -> list[str]:
+        """Add the official site's /pricing page, where pricing is most likely stated."""
+        official = next((hit.url for hit in ranked if official_score(name, hit.url) == 3), None)
+        if official is None:
+            return []
+        parts = urlparse(official)
+        pricing = f"{parts.scheme}://{parts.netloc}/pricing"
+        return [] if pricing in already else [pricing]
+
+    async def _repo_facts(self, name: str, urls: list[str]) -> RepoFacts | None:
+        if self.github is None:
+            return None
+        try:
+            return await self.github.facts_for(name, urls)
+        except Exception:
+            logger.warning("GitHub lookup failed for %s", name, exc_info=True)
+            return None
+
+    @staticmethod
+    def _apply_repo_facts(company: CompanyInfo, facts: RepoFacts | None) -> CompanyInfo:
+        """Overlay facts from the GitHub API, which are more reliable than extracted text."""
+        if facts is None:
+            return company
+        updates: dict[str, Any] = {
+            "github_url": facts.url,
+            "github_stars": facts.stars,
+            "license": facts.license,
+            "last_commit": facts.last_commit,
+            "maintenance": facts.maintenance,
+            "website": company.website or facts.homepage or facts.url,
+        }
+        if facts.is_open_source:
+            updates["is_open_source"] = True
+            if company.pricing_model is PricingModel.UNKNOWN:
+                updates["pricing_model"] = PricingModel.FREE
+        if facts.url not in company.sources:
+            updates["sources"] = [*company.sources, facts.url]
+        return company.model_copy(update=updates)
 
     @staticmethod
     def _choose_website(
@@ -357,10 +470,17 @@ class Workflow:
         return {"companies": matching, "analysis": analysis}
 
 
-def create_workflow(settings: Settings, client: httpx.AsyncClient) -> Workflow:
+def create_workflow(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    cache: ResultCache | RedisResultCache | None = None,
+) -> Workflow:
+    token = settings.github_token.get_secret_value() if settings.github_token else None
     return Workflow(
         settings=settings,
         llm=OpenAILLM(settings),
         search=create_search_manager(settings, client),
         scraper=Scraper(client, settings),
+        cache=cache,
+        github=GitHubFacts(client, token),
     )

@@ -1,3 +1,13 @@
+.search-first {
+  padding-top: 7rem;
+}
+
+@media (max-width: 768px) {
+  .search-first {
+    padding-top: 5.5rem;
+  }
+}
+
 .App {
   min-height: 100vh;
   width: 100%;

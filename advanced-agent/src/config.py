@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     brave_search_api_key: SecretStr | None = None
     google_custom_search_api_key: SecretStr | None = None
     google_search_engine_id: str | None = None
+    github_token: SecretStr | None = None
+    redis_url: SecretStr | None = None
+
+    # USD per million tokens, used only to log an estimated cost for each search.
+    input_price_per_million: float = 0.10
+    output_price_per_million: float = 0.50
 
     max_tools: int = 6
     max_concurrent_research: int = 4

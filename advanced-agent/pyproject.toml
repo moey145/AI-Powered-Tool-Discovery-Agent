@@ -12,11 +12,13 @@ dependencies = [
     "langgraph>=0.6",
     "pydantic>=2.11",
     "pydantic-settings>=2.10",
+    "redis>=6.0",
     "uvicorn[standard]>=0.35",
 ]
 
 [dependency-groups]
 dev = [
+    "fakeredis>=2.30",
     "pytest>=8.4",
     "pytest-asyncio>=1.1",
     "ruff>=0.12",

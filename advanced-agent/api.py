@@ -14,7 +14,8 @@ from src.config import Settings, get_settings
 from src.logger import get_logger, request_id, setup_logging
 from src.models import ResearchRequest, ResearchResponse, ResearchResult
 from src.net import create_client
-from src.rate_limit import RateLimiter
+from src.rate_limit import create_rate_limiter
+from src.store import create_cache, create_redis
 from src.workflow import Workflow, create_workflow
 
 logger = get_logger("api")
@@ -40,8 +41,8 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def enforce_rate_limit(request: Request) -> None:
-    retry_after = request.app.state.limiter.check(client_ip(request))
+async def enforce_rate_limit(request: Request) -> None:
+    retry_after = await request.app.state.limiter.check(client_ip(request))
     if retry_after is not None:
         raise HTTPException(
             status_code=429,
@@ -85,25 +86,29 @@ async def _event_stream(workflow: Workflow, query: str, limit: float) -> AsyncIt
 
 def create_app(
     settings: Settings | None = None,
-    workflow_factory: Callable[[Settings, Any], Workflow] = create_workflow,
+    workflow_factory: Callable[[Settings, Any, Any], Workflow] = create_workflow,
 ) -> FastAPI:
     settings = settings or get_settings()
     setup_logging()
+    redis = create_redis(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         async with create_client(settings) as client:
-            app.state.workflow = workflow_factory(settings, client)
+            app.state.workflow = workflow_factory(settings, client, create_cache(settings, redis))
             yield
+        if redis is not None:
+            await redis.aclose()
 
     app = FastAPI(title="Tool Discovery Agent", version=VERSION, lifespan=lifespan)
     app.state.settings = settings
-    app.state.limiter = RateLimiter(settings.rate_limit_per_minute, settings.daily_search_budget)
+    app.state.limiter = create_rate_limiter(settings, redis)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type"],
+        expose_headers=["Retry-After"],
     )
 
     @app.get("/health")

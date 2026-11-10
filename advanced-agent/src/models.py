@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 PricingPreference = Literal["any", "free", "freemium", "paid"]
 ResearchStatus = Literal["success", "partial", "no_results"]
+MaintenanceStatus = Literal["active", "slowing", "stale", "archived"]
 
 
 class PricingModel(StrEnum):
@@ -46,6 +47,11 @@ class CompanyInfo(BaseModel):
     language_support: list[str] = Field(default_factory=list)
     integration_capabilities: list[str] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
+    github_url: str | None = None
+    github_stars: int | None = None
+    license: str | None = None
+    last_commit: str | None = None
+    maintenance: MaintenanceStatus | None = None
 
 
 class ResearchResult(BaseModel):

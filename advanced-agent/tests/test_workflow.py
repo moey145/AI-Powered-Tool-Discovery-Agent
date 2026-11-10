@@ -1,8 +1,9 @@
 import pytest
 
+from src.github import RepoFacts
 from src.models import CompanyInfo, PricingModel
 from src.search_providers import SearchHit
-from src.workflow import Workflow, is_grounded, matches_pricing, official_score
+from src.workflow import Workflow, is_grounded, is_readable, matches_pricing, official_score
 from tests.conftest import FakeLLM, FakeScraper, FakeSearch, analysis
 
 
@@ -17,7 +18,7 @@ async def test_returns_researched_tools_and_recommendation(settings):
     assert [c.name for c in result.companies] == ["Redux", "Zustand"]
     assert result.status == "success"
     assert result.analysis == "Pick **Redux**."
-    assert result.companies[0].sources == ["https://redux.dev/docs"]
+    assert "https://redux.dev/docs" in result.companies[0].sources
 
 
 async def test_tool_searches_include_the_users_query_for_context(settings):
@@ -145,6 +146,108 @@ async def test_partial_results_are_not_cached(settings):
     calls = len(llm.calls)
     await workflow.run("react state")
     assert len(llm.calls) > calls
+
+
+async def test_stream_emits_each_tool_as_it_finishes(settings):
+    workflow, _ = build(settings)
+    events = [event async for event in workflow.stream("react state")]
+    finished = [event["company"]["name"] for event in events if event["type"] == "tool"]
+    assert sorted(finished) == ["Redux", "Zustand"]
+
+
+async def test_searches_again_when_too_few_tools_are_found(settings):
+    search = FakeSearch()
+    workflow, _ = build(settings, FakeLLM(tools=["Redux"]), search)
+    await workflow.run("react state")
+    assert search.discovery_queries == ["best react state", "react state top alternatives list"]
+
+
+async def test_does_not_search_again_with_enough_tools(settings):
+    search = FakeSearch(article="Redux Zustand MobX are popular.")
+    workflow, _ = build(settings, FakeLLM(tools=["Redux", "Zustand", "MobX"]), search)
+    await workflow.run("react state")
+    assert search.discovery_queries == ["best react state"]
+
+
+async def test_skips_sites_that_block_scraping(settings):
+    hits = [
+        SearchHit("https://www.reddit.com/r/reactjs", "Thread", "About Redux"),
+        SearchHit("https://redux.dev/docs", "Docs", "Redux docs"),
+    ]
+    scraper = FakeScraper()
+    workflow = Workflow(settings, FakeLLM(), FakeSearch(tool_hits=hits), scraper)
+    await workflow.run("react state")
+    assert not any("reddit.com" in url for url in scraper.requested)
+    assert "https://redux.dev/docs" in scraper.requested
+
+
+async def test_reads_the_official_pricing_page(settings):
+    scraper = FakeScraper()
+    workflow = Workflow(settings, FakeLLM(), FakeSearch(), scraper)
+    await workflow.run("react state")
+    assert "https://redux.dev/pricing" in scraper.requested
+
+
+class FakeGitHub:
+    async def facts_for(self, name, urls):
+        if name != "Redux":
+            return None
+        return RepoFacts(
+            url="https://github.com/reduxjs/redux",
+            stars=61000,
+            license="MIT",
+            is_open_source=True,
+            last_commit="2026-10-01",
+            maintenance="active",
+            homepage="https://redux.js.org",
+        )
+
+
+async def test_github_facts_override_extracted_unknowns(settings):
+    unknown = analysis(pricing_model=PricingModel.UNKNOWN, is_open_source=None)
+    hits = [SearchHit("https://blog.example.com/redux", "Post", "About Redux")]
+    workflow = Workflow(
+        settings,
+        FakeLLM(analyses={"Redux": unknown}),
+        FakeSearch(tool_hits=hits),
+        FakeScraper(),
+        github=FakeGitHub(),
+    )
+    result = await workflow.run("react state")
+    redux = next(c for c in result.companies if c.name == "Redux")
+    assert redux.is_open_source is True
+    assert redux.pricing_model is PricingModel.FREE
+    assert redux.license == "MIT"
+    assert redux.github_stars == 61000
+    assert redux.maintenance == "active"
+    assert redux.website == "https://redux.js.org"
+    assert "https://github.com/reduxjs/redux" in redux.sources
+
+
+async def test_github_facts_do_not_override_known_pricing(settings):
+    paid = analysis(pricing_model=PricingModel.FREEMIUM)
+    workflow = Workflow(
+        settings,
+        FakeLLM(analyses={"Redux": paid}),
+        FakeSearch(),
+        FakeScraper(),
+        github=FakeGitHub(),
+    )
+    result = await workflow.run("react state")
+    assert next(c for c in result.companies if c.name == "Redux").pricing_model.value == "Freemium"
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://www.reddit.com/r/x", False),
+        ("https://m.facebook.com/x", False),
+        ("https://netflix.com/x", True),
+        ("https://redux.js.org", True),
+    ],
+)
+def test_is_readable(url, expected):
+    assert is_readable(url) is expected
 
 
 @pytest.mark.parametrize(

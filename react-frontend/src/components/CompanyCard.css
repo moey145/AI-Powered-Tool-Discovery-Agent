@@ -12,6 +12,38 @@
   box-shadow: 0 12px 24px rgba(0,0,0,0.1);
 }
 
+.repo-facts {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.repo-facts a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.dark .repo-facts {
+  color: #94a3b8;
+}
+
+.metric-badge.maintenance-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.metric-badge.maintenance-slowing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.metric-badge.maintenance-stale,
+.metric-badge.maintenance-archived {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .company-header {
   display: flex;
   justify-content: space-between;

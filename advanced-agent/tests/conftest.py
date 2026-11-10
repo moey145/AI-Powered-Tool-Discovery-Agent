@@ -65,11 +65,13 @@ class FakeSearch:
         self.article = article
         self.tool_hits = tool_hits
         self.tool_queries: list[str] = []
+        self.discovery_queries: list[str] = []
 
     async def search(self, query, limit):
         if self.article is None:
             return []
-        if query.startswith("best "):
+        if query.startswith("best ") or query.endswith(" top alternatives list"):
+            self.discovery_queries.append(query)
             return [SearchHit("https://blog.example.com/best", "Best tools", self.article)]
         self.tool_queries.append(query)
         if self.tool_hits is not None:
@@ -80,5 +82,9 @@ class FakeSearch:
 
 
 class FakeScraper:
+    def __init__(self):
+        self.requested: list[str] = []
+
     async def fetch_many(self, urls):
+        self.requested.extend(urls)
         return [Page(url=url, title="Page", text="Page body text") for url in urls]

@@ -29,7 +29,7 @@ class FakeWorkflow:
 def client_for(settings, workflow=None) -> TestClient:
     workflow = workflow or FakeWorkflow()
     return TestClient(
-        create_app(settings, workflow_factory=lambda _settings, _client: workflow),
+        create_app(settings, workflow_factory=lambda _settings, _client, _cache: workflow),
         raise_server_exceptions=False,
     )
 
