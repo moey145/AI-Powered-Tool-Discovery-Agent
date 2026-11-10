@@ -6,5 +6,7 @@
   {"query": "paid CI/CD platforms", "pricing": "paid", "expect_any": ["CircleCI", "TeamCity", "GitHub Actions", "Buildkite", "Harness"]},
   {"query": "Python web frameworks", "pricing": "any", "expect_any": ["Django", "Flask", "FastAPI"]},
   {"query": "C++ testing frameworks", "pricing": "any", "expect_any": ["GoogleTest", "Google Test", "Catch2", "doctest"]},
-  {"query": "Vue component libraries", "pricing": "any", "expect_any": ["Vuetify", "PrimeVue", "Quasar", "Element Plus", "Naive UI"]}
+  {"query": "Vue component libraries", "pricing": "any", "expect_any": ["Vuetify", "PrimeVue", "Quasar", "Element Plus", "Naive UI"]},
+  {"query": "Rust web frameworks", "pricing": "any", "expect_any": ["Actix", "Axum", "Rocket", "Warp"]},
+  {"query": "Go web frameworks", "pricing": "any", "expect_any": ["Gin", "Echo", "Fiber", "Chi"]}
 ]

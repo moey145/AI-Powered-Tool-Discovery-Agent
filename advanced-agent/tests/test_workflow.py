@@ -63,6 +63,70 @@ async def test_accepts_llm_website_from_a_retrieved_domain(settings):
     assert result.companies[0].website == "https://redux.dev/introduction"
 
 
+async def test_tool_analysis_sees_the_users_search(settings):
+    workflow, llm = build(settings)
+    await workflow.run("rust web frameworks")
+    analysis_prompts = [p for p in llm.prompts if p.startswith("Tool: Redux")]
+    assert analysis_prompts[0].startswith("Tool: Redux\nSearch: rust web frameworks\n")
+
+
+async def test_drops_a_tool_whose_sources_describe_a_different_product(settings):
+    other_product = analysis(describes_requested_tool=False)
+    workflow, _ = build(settings, FakeLLM(analyses={"Zustand": other_product}))
+    result = await workflow.run("react state")
+    assert [c.name for c in result.companies] == ["Redux"]
+    assert result.unresearched == ["Zustand"]
+    assert result.status == "partial"
+
+
+async def test_relevant_sources_are_matched_even_with_brackets(settings):
+    llm = FakeLLM(analyses={"Redux": analysis(relevant_sources=["[https://redux.dev/docs]"])})
+    workflow, _ = build(settings, llm)
+    result = await workflow.run("react state")
+    redux = next(c for c in result.companies if c.name == "Redux")
+    assert redux.website == "https://redux.dev"
+    assert "https://redux.dev/docs" in redux.sources
+
+
+class RecordingGitHub:
+    def __init__(self):
+        self.urls: list[str] = []
+
+    async def facts_for(self, name, urls):
+        self.urls.extend(urls)
+        return None
+
+
+async def test_same_named_product_sources_supply_no_links_or_facts(settings):
+    terminal = "https://www.warp.dev"
+    framework = "https://docs.rs/warp/latest/warp/"
+    hits = [SearchHit(terminal, "Warp terminal", "AI terminal"), SearchHit(framework, "warp", "")]
+    llm = FakeLLM(
+        tools=["Warp"],
+        analyses={
+            "Warp": analysis(
+                relevant_sources=[framework],
+                website=terminal,
+                description="A Rust web framework.",
+            )
+        },
+    )
+    github = RecordingGitHub()
+    workflow = Workflow(
+        settings,
+        llm,
+        FakeSearch(article="Warp is popular.", tool_hits=hits),
+        FakeScraper(),
+        github=github,
+    )
+    result = await workflow.run("rust web frameworks")
+    warp = result.companies[0]
+    assert warp.website != terminal
+    assert all("warp.dev" not in url for url in warp.sources)
+    assert github.urls
+    assert all("warp.dev" not in url for url in github.urls)
+
+
 async def test_one_failing_tool_gives_a_partial_result(settings):
     llm = FakeLLM()
     llm.fail_for.add("Zustand")

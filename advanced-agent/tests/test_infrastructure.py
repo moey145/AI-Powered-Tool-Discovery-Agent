@@ -324,6 +324,18 @@ async def test_github_rejects_a_same_named_repository_from_someone_else(settings
         assert await GitHubFacts(client).facts_for("Pinecone", ["https://www.pinecone.io"]) is None
 
 
+async def test_github_search_needs_a_homepage_match_even_for_a_same_named_account(settings):
+    robot = repo_json(
+        full_name="husky/husky",
+        html_url="https://github.com/husky/husky",
+        homepage="http://wiki.ros.org/Robots/Husky",
+    )
+    handler = lambda request: httpx.Response(200, json={"items": [robot]})  # noqa: E731
+    urls = ["https://typicode.github.io/husky/"]
+    async with mock_client(handler, settings) as client:
+        assert await GitHubFacts(client).facts_for("Husky", urls) is None
+
+
 async def test_github_rejects_an_unrelated_repository_found_in_search_results(settings):
     personal = repo_json(
         full_name="vinijmoura/Azure-DevOps",
@@ -340,7 +352,11 @@ async def test_github_rejects_an_unrelated_repository_found_in_search_results(se
     ("tool", "full_name", "homepage", "urls", "expected"),
     [
         ("Jest", "jestjs/jest", "", [], True),
+        ("Vitest", "vitest-dev/vitest", "", [], True),
+        ("Sentry", "getsentry/sentry", "", [], True),
+        ("Django", "django/django", "", [], True),
         ("AWS CDK", "aws/aws-cdk", "", [], True),
+        ("Warp", "warpdotdev/warp", "https://www.warp.dev", ["https://docs.rs/warp"], False),
         ("Zustand", "pmndrs/zustand", "https://zustand-demo.pmnd.rs/", ["https://x.pmnd.rs"], True),
         ("Pinecone", "wmww/Pinecone", "http://p.herokuapp.com", ["https://q.herokuapp.com"], False),
         ("Overcommit", "sds/overcommit", "", ["https://github.com/sds/overcommit"], False),

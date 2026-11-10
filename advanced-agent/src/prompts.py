@@ -25,7 +25,16 @@ Rules:
 ANALYSIS_SYSTEM = f"""You extract facts about one developer tool from web pages.
 {_UNTRUSTED}
 
+The tool was suggested as an answer to the user's search. Different products can share a
+name (for example, Warp the terminal app and warp the Rust web framework). Describe only
+the product that answers the search, and ignore sources about any other product.
+
 Rules:
+- Set describes_requested_tool to false if the sources only cover a same-named product that
+  does not answer the search.
+- relevant_sources: list the URLs from the source labels (without the square brackets) for
+  every source about the requested product. Leave out sources about a same-named product.
+- website: must be the site of the requested product, not of a same-named product.
 - Use only what the sources state. Use Unknown, null, or an empty list for anything else.
 - pricing_model: Free means no paid plans; Freemium means a free tier plus paid plans;
   Paid means no free tier; Enterprise means sales-led contracts only. If the sources show

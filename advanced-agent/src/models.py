@@ -26,6 +26,12 @@ class ToolDiscovery(BaseModel):
 
 
 class ToolAnalysis(BaseModel):
+    describes_requested_tool: bool = Field(
+        description="False if the sources only describe a different product with the same name"
+    )
+    relevant_sources: list[str] = Field(
+        description="Source labels, copied exactly, that are about the requested tool"
+    )
     description: str = Field(description="One or two factual sentences on what the tool does")
     website: str | None = Field(description="Official website, only if present in the sources")
     pricing_model: PricingModel = Field(description="Use Unknown unless the sources say")

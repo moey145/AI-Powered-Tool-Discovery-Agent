@@ -37,6 +37,9 @@ _OPEN_SOURCE_LICENSES = {
     "Unlicense",
     "Zlib",
 }
+# Common ways projects name their GitHub accounts: jestjs, vitest-dev, cypress-io, getsentry.
+_OWNER_SUFFIXES = ("js", "dev", "io", "hq", "org", "lang", "labs", "app", "project", "team")
+_OWNER_PREFIXES = ("get", "use", "the")
 _SHARED_HOSTS = {
     "github.io",
     "gitlab.io",
@@ -119,16 +122,28 @@ def site_of(url: str) -> str:
     return ".".join(labels[-keep:])
 
 
-def belongs_to_tool(tool: str, data: dict[str, Any], urls: list[str]) -> bool:
+def belongs_to_tool(
+    tool: str, data: dict[str, Any], urls: list[str], by_owner: bool = True
+) -> bool:
     """A matching name isn't proof of ownership: anyone can create a repository called "Pinecone".
 
     Accept a repository when its account is named after the tool (django/django, jestjs/jest,
-    aws/aws-cdk), or when its listed homepage is on a site that came up for the tool.
+    getsentry/sentry), when the tool is named after its account (aws/aws-cdk), or when its
+    listed homepage is on a site that came up for the tool. A shared prefix is not enough:
+    warpdotdev owns the Warp terminal, not the warp web framework.
+
+    Pass by_owner=False for repositories found only by searching GitHub: a matching account
+    name is weak evidence there (husky/husky is a robot, not the git hooks tool).
     """
     owner = _slug(data["full_name"].partition("/")[0])
     slug = _slug(tool)
-    if len(owner) >= 3 and (owner.startswith(slug) or slug.startswith(owner)):
-        return True
+    if by_owner:
+        if owner == slug or owner in {slug + suffix for suffix in _OWNER_SUFFIXES}:
+            return True
+        if owner in {prefix + slug for prefix in _OWNER_PREFIXES}:
+            return True
+        if len(owner) >= 3 and slug.startswith(owner):
+            return True
     homepage = data.get("homepage") or ""
     if not homepage.startswith(("http://", "https://")):
         return False
@@ -176,8 +191,13 @@ class GitHubFacts:
         if key in self._cache:
             return self._cache[key]
         paths = [path for path in map(repo_path, urls) if path and names_match(name, path)]
-        data = await self._get(f"/repos/{paths[0]}") if paths else await self._search(name, urls)
-        facts = parse_repo(data) if data and belongs_to_tool(name, data, urls) else None
+        if paths:
+            data = await self._get(f"/repos/{paths[0]}")
+            if data and not belongs_to_tool(name, data, urls):
+                data = None
+        else:
+            data = await self._search(name, urls)
+        facts = parse_repo(data) if data else None
         if len(self._cache) >= _MAX_CACHED:
             self._cache.clear()
         self._cache[key] = facts
@@ -192,7 +212,7 @@ class GitHubFacts:
             if (
                 item.get("stargazers_count", 0) >= _MIN_STARS
                 and names_match(name, item["full_name"])
-                and belongs_to_tool(name, item, urls)
+                and belongs_to_tool(name, item, urls, by_owner=False)
             ):
                 return item
         return None

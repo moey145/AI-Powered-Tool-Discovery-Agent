@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 
 os.environ["OPENAI_API_KEY"] = "test-key"  # Lets `api` import without a real key.
 
@@ -18,6 +19,8 @@ def settings() -> Settings:
 
 def analysis(**overrides) -> ToolAnalysis:
     values = {
+        "describes_requested_tool": True,
+        "relevant_sources": ["*"],  # FakeLLM expands this to every source it was shown.
         "description": "A tool.",
         "website": None,
         "pricing_model": PricingModel.FREE,
@@ -36,12 +39,14 @@ class FakeLLM:
         self.preference = preference
         self.analyses = analyses or {}
         self.calls: list[str] = []
+        self.prompts: list[str] = []
         self.fail_for: set[str] = set()
         self.delay_for: set[str] = set()
         self.fail_text = False
 
     async def structured(self, schema, system, user):
         self.calls.append(schema.__name__)
+        self.prompts.append(user)
         if schema is ToolDiscovery:
             return ToolDiscovery(tools=self.tools, pricing_preference=self.preference)
         name = user.split("\n", 1)[0].removeprefix("Tool: ")
@@ -49,7 +54,11 @@ class FakeLLM:
             await asyncio.sleep(30)
         if name in self.fail_for:
             raise RuntimeError("model error with secret detail")
-        return self.analyses.get(name, analysis())
+        result = self.analyses.get(name, analysis())
+        if result.relevant_sources == ["*"]:
+            shown = re.findall(r"^\[(https?://[^\]]+)\]$", user, flags=re.MULTILINE)
+            result = result.model_copy(update={"relevant_sources": shown})
+        return result
 
     async def text(self, system, user):
         self.calls.append("text")

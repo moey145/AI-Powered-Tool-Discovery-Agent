@@ -21,8 +21,10 @@ from src.workflow import LLM, create_workflow
 MIN_TOOLS = 3
 MAX_UNKNOWN_PRICING = 0.5
 JUDGE_SYSTEM = """You grade a developer-tool search engine.
-Given a search and the tools it returned, list only the tools that clearly do not answer the
-search. A tool from an adjacent category that a developer could reasonably use is acceptable."""
+Given a search and the tools it returned, each with the description the engine wrote, list
+only the tools that clearly do not answer the search. Also list a tool whose description is
+of a different, same-named product. A tool from an adjacent category that a developer could
+reasonably use is acceptable."""
 
 
 class Judgement(BaseModel):
@@ -48,9 +50,9 @@ async def check(case: dict, result: ResearchResult, llm: LLM) -> list[str]:
     if names and len(unknown) / len(names) > MAX_UNKNOWN_PRICING:
         problems.append(f"pricing unknown for {unknown}")
     if names:
-        listing = ", ".join(company.name for company in result.companies)
+        listing = "\n".join(f"- {c.name}: {c.description}" for c in result.companies)
         verdict = await llm.structured(
-            Judgement, JUDGE_SYSTEM, f"Search: {case['query']}\nTools: {listing}"
+            Judgement, JUDGE_SYSTEM, f"Search: {case['query']}\nTools:\n{listing}"
         )
         if verdict.irrelevant:
             problems.append(f"judged irrelevant: {verdict.irrelevant}")

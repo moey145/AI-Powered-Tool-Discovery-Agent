@@ -66,6 +66,8 @@ async def test_structured_analysis_schema_is_strict_and_parses_enums(settings):
     requests: list[httpx.Request] = []
     content = json.dumps(
         {
+            "describes_requested_tool": True,
+            "relevant_sources": ["https://a.dev"],
             "description": "A tool.",
             "website": None,
             "pricing_model": "Freemium",

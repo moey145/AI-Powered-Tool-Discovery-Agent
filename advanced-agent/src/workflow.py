@@ -170,6 +170,11 @@ def _host(url: str) -> str:
     return urlparse(url).netloc.lower().removeprefix("www.")
 
 
+def _url_key(url: str) -> str:
+    # Models sometimes copy a source label together with its surrounding brackets.
+    return url.strip().strip("[]<>").strip().rstrip("/").lower()
+
+
 def is_readable(url: str) -> bool:
     """False for sites that usually block scraping or show only a login wall."""
     host = _host(url)
@@ -366,17 +371,28 @@ class Workflow:
         ranked = sorted(hits, key=lambda hit: official_score(name, hit.url), reverse=True)
         readable = [hit.url for hit in ranked if is_readable(hit.url)][:_PAGES_PER_TOOL]
         urls = readable + self._pricing_page(name, ranked, readable)
-        pages, facts = await asyncio.gather(
-            self.scraper.fetch_many(urls),
-            self._repo_facts(name, [hit.url for hit in hits]),
-        )
+        pages = await self.scraper.fetch_many(urls)
         sections = [(hit.url, f"{hit.title}. {hit.snippet}") for hit in hits]
         sections += [(page.url, page.text) for page in pages]
         analysis = await self.llm.structured(
-            ToolAnalysis, ANALYSIS_SYSTEM, f"Tool: {name}\n\n{format_sources(sections)}"
+            ToolAnalysis,
+            ANALYSIS_SYSTEM,
+            f"Tool: {name}\nSearch: {query}\n\n{format_sources(sections)}",
         )
+        if not analysis.describes_requested_tool:
+            logger.info("Sources for %s describe a different product", name)
+            return None
+
+        # Search results for a shared name mix products (Warp the terminal, warp the web
+        # framework), so only sources the analysis judged relevant can supply links and facts.
+        relevant = {_url_key(url) for url in analysis.relevant_sources}
+        ranked = [hit for hit in ranked if _url_key(hit.url) in relevant]
+        pages = [page for page in pages if _url_key(page.url) in relevant]
+        relevant_urls = [hit.url for hit in ranked] + [page.url for page in pages]
+
         website = self._choose_website(name, analysis.website, ranked, pages)
         sources = [page.url for page in pages] or [hit.url for hit in ranked[:_PAGES_PER_TOOL]]
+        facts = await self._repo_facts(name, relevant_urls)
         company = CompanyInfo(
             name=name,
             description=analysis.description,
