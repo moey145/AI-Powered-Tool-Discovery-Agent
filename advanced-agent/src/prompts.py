@@ -35,6 +35,9 @@ Rules:
 - relevant_sources: list the URLs from the source labels (without the square brackets) for
   every source about the requested product. Leave out sources about a same-named product.
 - website: must be the site of the requested product, not of a same-named product.
+- paid_plans_mentioned: true only if the sources say the tool's own makers sell something
+  for it, such as a paid tier, hosted plan, or commercial edition. Paid support from third
+  parties does not count. Do not infer paid plans from popularity or the word "enterprise".
 - Use only what the sources state. Use Unknown, null, or an empty list for anything else.
 - pricing_model: Free means no paid plans; Freemium means a free tier plus paid plans;
   Paid means no free tier; Enterprise means sales-led contracts only. If the sources show

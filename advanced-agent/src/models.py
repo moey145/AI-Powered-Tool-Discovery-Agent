@@ -35,6 +35,9 @@ class ToolAnalysis(BaseModel):
     description: str = Field(description="One or two factual sentences on what the tool does")
     website: str | None = Field(description="Official website, only if present in the sources")
     pricing_model: PricingModel = Field(description="Use Unknown unless the sources say")
+    paid_plans_mentioned: bool = Field(
+        description="True only if the sources say the tool's makers sell a paid plan or edition"
+    )
     is_open_source: bool | None = Field(description="Null unless the sources say")
     api_available: bool | None = Field(description="Null unless the sources say")
     tech_stack: list[str]

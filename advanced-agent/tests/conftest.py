@@ -24,6 +24,7 @@ def analysis(**overrides) -> ToolAnalysis:
         "description": "A tool.",
         "website": None,
         "pricing_model": PricingModel.FREE,
+        "paid_plans_mentioned": False,
         "is_open_source": True,
         "api_available": None,
         "tech_stack": [],

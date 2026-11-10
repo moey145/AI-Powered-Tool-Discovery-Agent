@@ -288,15 +288,31 @@ async def test_github_facts_override_extracted_unknowns(settings):
     assert "https://github.com/reduxjs/redux" in redux.sources
 
 
-async def test_github_facts_do_not_override_known_pricing(settings):
-    paid = analysis(pricing_model=PricingModel.FREEMIUM)
+async def redux_pricing(settings, label: PricingModel, paid_plans_mentioned: bool) -> str:
+    guess = analysis(pricing_model=label, paid_plans_mentioned=paid_plans_mentioned)
     workflow = Workflow(
         settings,
-        FakeLLM(analyses={"Redux": paid}),
+        FakeLLM(analyses={"Redux": guess}),
         FakeSearch(),
         FakeScraper(),
         github=FakeGitHub(),
     )
+    result = await workflow.run("react state")
+    return next(c for c in result.companies if c.name == "Redux").pricing_model.value
+
+
+async def test_open_source_with_paid_plans_keeps_its_label(settings):
+    assert await redux_pricing(settings, PricingModel.FREEMIUM, True) == "Freemium"
+
+
+async def test_open_source_without_paid_plans_is_free_despite_a_wrong_guess(settings):
+    assert await redux_pricing(settings, PricingModel.FREEMIUM, False) == "Free"
+    assert await redux_pricing(settings, PricingModel.PAID, False) == "Free"
+
+
+async def test_pricing_is_not_overridden_without_an_open_source_license(settings):
+    guess = analysis(pricing_model=PricingModel.FREEMIUM, paid_plans_mentioned=False)
+    workflow, _ = build(settings, FakeLLM(analyses={"Redux": guess}))
     result = await workflow.run("react state")
     assert next(c for c in result.companies if c.name == "Redux").pricing_model.value == "Freemium"
 

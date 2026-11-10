@@ -405,7 +405,7 @@ class Workflow:
             integration_capabilities=analysis.integration_capabilities[:5],
             sources=sources,
         )
-        return self._apply_repo_facts(company, facts)
+        return self._apply_repo_facts(company, facts, analysis.paid_plans_mentioned)
 
     @staticmethod
     def _pricing_page(name: str, ranked: list[SearchHit], already: list[str]) -> list[str]:
@@ -427,8 +427,15 @@ class Workflow:
             return None
 
     @staticmethod
-    def _apply_repo_facts(company: CompanyInfo, facts: RepoFacts | None) -> CompanyInfo:
-        """Overlay facts from the GitHub API, which are more reliable than extracted text."""
+    def _apply_repo_facts(
+        company: CompanyInfo, facts: RepoFacts | None, paid_plans_mentioned: bool
+    ) -> CompanyInfo:
+        """Overlay facts from the GitHub API, which are more reliable than extracted text.
+
+        An open-source license plus sources that mention no paid offering means Free, even if
+        the model guessed Freemium or Paid. Tools like Supabase, which are open source but
+        sell a hosted plan, keep the model's label.
+        """
         if facts is None:
             return company
         updates: dict[str, Any] = {
@@ -441,7 +448,7 @@ class Workflow:
         }
         if facts.is_open_source:
             updates["is_open_source"] = True
-            if company.pricing_model is PricingModel.UNKNOWN:
+            if not paid_plans_mentioned:
                 updates["pricing_model"] = PricingModel.FREE
         if facts.url not in company.sources:
             updates["sources"] = [*company.sources, facts.url]

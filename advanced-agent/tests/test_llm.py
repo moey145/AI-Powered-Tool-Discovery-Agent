@@ -71,6 +71,7 @@ async def test_structured_analysis_schema_is_strict_and_parses_enums(settings):
             "description": "A tool.",
             "website": None,
             "pricing_model": "Freemium",
+            "paid_plans_mentioned": True,
             "is_open_source": None,
             "api_available": True,
             "tech_stack": [],
