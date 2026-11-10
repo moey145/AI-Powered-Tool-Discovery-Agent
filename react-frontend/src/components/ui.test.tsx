@@ -181,6 +181,27 @@ describe("SearchSection", () => {
     expect(props.onSearch).toHaveBeenCalledWith("react");
   });
 
+  it("shows the hero headline", () => {
+    renderSearch();
+    expect(
+      screen.getByRole("heading", { name: "Find the Perfect Tools for Your Projects" })
+    ).toBeInTheDocument();
+  });
+
+  it("clears the query with the clear button", async () => {
+    const props = renderSearch();
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(props.setQuery).toHaveBeenCalledWith("");
+  });
+
+  it("focuses the search box when / is pressed", async () => {
+    renderSearch({ query: "" });
+    const input = screen.getByRole("textbox", { name: /Describe the tools/ });
+    input.blur();
+    await userEvent.keyboard("/");
+    expect(input).toHaveFocus();
+  });
+
   it("repeats recent searches", async () => {
     const props = renderSearch({ recentSearches: ["vue tools"] });
     await userEvent.click(screen.getByRole("button", { name: "vue tools" }));
