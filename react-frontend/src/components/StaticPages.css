@@ -1,80 +1,54 @@
 .static-container {
-  max-width: 900px;
+  width: min(720px, 100% - 2.5rem);
   margin: 0 auto;
-  padding: 5.5rem 1rem 4rem; /* add extra top padding for fixed navbar */
+  padding-block: 3rem 5rem;
 }
 
 .back-home {
   display: inline-block;
-  margin-bottom: 1.5rem;
-  color: #3b82f6;
-  text-decoration: none;
-  font-weight: 600;
+  margin-bottom: 2rem;
+  color: var(--text-2);
+  font-size: 0.92rem;
 }
 
 .back-home:hover {
-  text-decoration: underline;
+  color: var(--text);
 }
 
 .static-header h1 {
-  font-size: 2rem;
-  margin: 0 0 1.5rem 0;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  margin-bottom: 1.5rem;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 700;
 }
 
 .static-section {
-  margin-top: 1.5rem;
+  color: var(--text-2);
+  line-height: 1.75;
 }
 
 .static-section h2 {
-  font-size: 1.5rem;
-  margin: 2rem 0 0.75rem 0;
-  color: #1e293b;
-  font-weight: 600;
-}
-
-.static-section h2:first-of-type {
-  margin-top: 0;
+  margin: 2.25rem 0 0.75rem;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 650;
 }
 
 .static-section p {
-  line-height: 1.7;
   margin-bottom: 1rem;
-  color: #334155;
+}
+
+.static-section strong {
+  color: var(--text);
 }
 
 .static-section ul {
-  margin-bottom: 1.5rem;
-  padding-left: 1.5rem;
+  margin: 0 0 1rem 1.25rem;
 }
 
 .static-section li {
-  line-height: 1.7;
-  margin-bottom: 0.5rem;
-  color: #334155;
+  margin-bottom: 0.4rem;
 }
 
 .static-link {
-  margin-left: 0.3rem;
-  color: #3b82f6;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.static-link:hover {
-  text-decoration: underline;
-}
-
-/* Dark mode adjustments */
-.dark .static-section h2 {
-  color: #f1f5f9;
-}
-
-.dark .static-section p,
-.dark .static-section li {
-  color: #cbd5e1;
+  color: var(--accent);
 }

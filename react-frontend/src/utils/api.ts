@@ -71,7 +71,21 @@ interface SearchOptions {
   signal?: AbortSignal;
 }
 
-const isAbort = (error: unknown) => error instanceof Error && error.name === "AbortError";
+export const isAbort = (error: unknown) =>
+  typeof error === "object" && error !== null && (error as { name?: unknown }).name === "AbortError";
+
+/** Rejects when the signal aborts. Browsers don't reliably end a piped body stream on abort. */
+function whenAborted(signal?: AbortSignal): { promise: Promise<never>; dispose: () => void } {
+  if (!signal) return { promise: new Promise<never>(() => {}), dispose: () => {} };
+  let onAbort = () => {};
+  const promise = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new DOMException("The search was cancelled.", "AbortError"));
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  });
+  promise.catch(() => {}); // Only awaited while reading; never report it as unhandled.
+  return { promise, dispose: () => signal.removeEventListener("abort", onAbort) };
+}
 
 /** Runs a search, reporting real backend progress, and resolves with the final result. */
 export async function searchTools(
@@ -105,15 +119,19 @@ export async function searchTools(
 
   if (!response.body) throw new ApiError("The connection was lost. Please try again.", "network");
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  const aborted = whenAborted(signal);
   try {
     for (;;) {
-      const { value, done } = await reader.read();
+      const { value, done } = await Promise.race([reader.read(), aborted.promise]);
       if (done) break;
       parse(value);
     }
   } catch (error) {
+    reader.cancel().catch(() => {});
     if (error instanceof ApiError || isAbort(error)) throw error;
     throw new ApiError("The connection was lost. Please try again.", "network");
+  } finally {
+    aborted.dispose();
   }
 
   if (!result) throw new ApiError("The connection was lost. Please try again.", "network");

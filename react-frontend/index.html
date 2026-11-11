@@ -8,7 +8,26 @@
       name="description"
       content="Describe the developer tool you need and get a sourced comparison of pricing, licensing, and maintenance."
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
     <title>Tool Scraper</title>
+    <script>
+      // Apply the saved or system theme before first paint, so the page never flashes.
+      (function () {
+        var dark;
+        try {
+          var saved = localStorage.getItem("theme");
+          dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        } catch (e) {
+          dark = false;
+        }
+        document.documentElement.classList.add(dark ? "dark" : "light");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

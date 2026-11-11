@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import CompanyCard from "./CompanyCard";
 import ResultsSection from "./ResultsSection";
 import SearchSection from "./SearchSection";
@@ -54,8 +54,37 @@ describe("CompanyCard", () => {
         })}
       />
     );
-    expect(screen.getByText("Possibly abandoned")).toBeInTheDocument();
-    expect(screen.getByText(/★ 61k · MIT · updated 2026-10-01/)).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toHaveAttribute("title", "Possibly abandoned");
+    expect(screen.getByText("61k")).toBeInTheDocument();
+    expect(screen.getByText("MIT")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-01")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Redux on GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/reduxjs/redux"
+    );
+  });
+
+  it("shows secondary facts without a toggle", () => {
+    render(
+      <CompanyCard
+        company={tool("Redux", { language_support: ["JavaScript"], api_available: true })}
+      />
+    );
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+    expect(screen.getByText("JavaScript")).toBeVisible();
+    expect(screen.getByText("Available")).toBeVisible();
+  });
+
+  it("lists each source site once", () => {
+    render(
+      <CompanyCard
+        company={tool("Vitest", {
+          sources: ["https://vitest.dev/guide", "https://vitest.dev/config", "https://github.com/x/y"],
+        })}
+      />
+    );
+    expect(screen.getAllByRole("link", { name: "vitest.dev" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "github.com" })).toBeInTheDocument();
   });
 
   it("does not link to unsafe URLs", () => {
@@ -67,7 +96,7 @@ describe("CompanyCard", () => {
 describe("ResultsSection", () => {
   it("shows tools while research is still running", () => {
     render(<ResultsSection results={null} streamedTools={[tool("Redux")]} loading />);
-    expect(screen.getByText("Researching tools (1)")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Researching tools/ })).toHaveTextContent("1");
     expect(screen.getByText("Redux")).toBeInTheDocument();
   });
 
@@ -83,7 +112,7 @@ describe("ResultsSection", () => {
     const { container } = render(
       <ResultsSection results={result({ analysis })} streamedTools={[]} loading={false} />
     );
-    expect(container.querySelector(".recommendation-text img")).toBeNull();
+    expect(container.querySelector(".recommendation img")).toBeNull();
     expect(screen.getByText("Redux", { selector: "strong" })).toBeInTheDocument();
   });
 
@@ -109,7 +138,7 @@ describe("ResultsSection", () => {
         loading={false}
       />
     );
-    expect(screen.getByText(/couldn't find verifiable tools/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No verified tools found" })).toBeInTheDocument();
   });
 
   it("lists tools that could not be researched", () => {
@@ -132,7 +161,6 @@ describe("SearchSection", () => {
       onSearch: vi.fn(),
       onCancel: vi.fn(),
       loading: false,
-      hasResults: false,
       loadingProgress: 0,
       loadingStage: "",
       error: null,
@@ -156,13 +184,20 @@ describe("SearchSection", () => {
 
   it("accepts C++ as a query", async () => {
     const props = renderSearch({ query: "C++" });
-    await userEvent.click(screen.getByRole("button", { name: /Research Topic/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(props.onSearch).toHaveBeenCalledWith("C++");
+  });
+
+  it("explains an empty search instead of disabling the button", async () => {
+    const props = renderSearch({ query: "" });
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(props.onSearch).not.toHaveBeenCalled();
+    expect(props.onError).toHaveBeenCalledWith(expect.objectContaining({ type: "validation" }));
   });
 
   it("reports queries that are too short", async () => {
     const props = renderSearch({ query: "a" });
-    await userEvent.click(screen.getByRole("button", { name: /Research Topic/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(props.onSearch).not.toHaveBeenCalled();
     expect(props.onError).toHaveBeenCalledWith(expect.objectContaining({ type: "validation" }));
   });
@@ -172,6 +207,40 @@ describe("SearchSection", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Reading");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(props.onCancel).toHaveBeenCalledOnce();
+  });
+
+  // In a real browser, if React reused the Cancel <button> as the Search button, its type
+  // would flip to "submit" mid-click and the Cancel click would start a new search.
+  // jsdom doesn't reproduce that, so this checks the cause: they must be separate elements.
+  it("renders Cancel and Search as separate button elements", async () => {
+    let finishCancel = () => {};
+    const Harness = () => {
+      const [loading, setLoading] = useState(true);
+      finishCancel = () => setLoading(false);
+      return (
+        <ToastContext.Provider value={vi.fn()}>
+          <SearchSection
+            query="react"
+            setQuery={vi.fn()}
+            onSearch={vi.fn()}
+            onCancel={vi.fn()}
+            loading={loading}
+            loadingProgress={40}
+            loadingStage="Reading"
+            error={null}
+            onError={vi.fn()}
+            recentSearches={[]}
+          />
+        </ToastContext.Provider>
+      );
+    };
+    render(<Harness />);
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveAttribute("type", "button");
+    act(() => finishCancel());
+    const submit = screen.getByRole("button", { name: "Search" });
+    expect(submit).not.toBe(cancel);
+    expect(cancel).not.toBeInTheDocument();
   });
 
   it("offers a retry after a failure", async () => {
@@ -200,6 +269,12 @@ describe("SearchSection", () => {
     input.blur();
     await userEvent.keyboard("/");
     expect(input).toHaveFocus();
+  });
+
+  it("submits with the Enter key", async () => {
+    const props = renderSearch({ query: "react" });
+    await userEvent.type(screen.getByRole("textbox", { name: /Describe the tools/ }), "{Enter}");
+    expect(props.onSearch).toHaveBeenCalledWith("react");
   });
 
   it("repeats recent searches", async () => {

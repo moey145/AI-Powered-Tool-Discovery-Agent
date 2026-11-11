@@ -89,6 +89,29 @@ describe("searchTools", () => {
     await expect(searchTools("react")).rejects.toThrow("Try again in 42 seconds.");
   });
 
+  it("stops promptly on cancel even if the stream never ends", async () => {
+    const encoder = new TextEncoder();
+    // A body that sends one event and then hangs, like a browser that ignores the abort.
+    const hanging = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(frame({ type: "progress", percent: 5, message: "x" })));
+      },
+    });
+    vi.stubGlobal("fetch", async () => new Response(hanging));
+    const controller = new AbortController();
+    const search = searchTools("react", { signal: controller.signal, onProgress: () => controller.abort() });
+    await expect(search).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects immediately if already cancelled", async () => {
+    vi.stubGlobal("fetch", async () => new Response(new ReadableStream({ start() {} })));
+    const controller = new AbortController();
+    controller.abort();
+    await expect(searchTools("react", { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
+
   it("reports network failures", async () => {
     vi.stubGlobal("fetch", async () => {
       throw new TypeError("Failed to fetch");

@@ -1,54 +1,49 @@
-import { FaMagnifyingGlass, FaChartColumn } from "react-icons/fa6";
-import { BsLightningFill } from "react-icons/bs";
+import { LuFileSearch, LuScale, LuSearch } from "react-icons/lu";
 import "./Features.css";
 
-const features = [
+const STEPS = [
   {
-    icon: <FaMagnifyingGlass className="feature-icon" />,
-    title: "Smart Tool Discovery",
+    icon: LuSearch,
+    title: "Searches the web",
     description:
-      "Our AI-powered scraper finds the best tools for your specific needs. Just describe what you're looking for and get comprehensive results instantly.",
+      "Your description goes to live search, and we read the comparison articles developers actually use.",
   },
   {
-    icon: <FaChartColumn className="feature-icon" />,
-    title: "Comprehensive Analysis",
+    icon: LuFileSearch,
+    title: "Reads each tool's own pages",
     description:
-      "See pricing, licensing, GitHub activity, and the sources behind every result. Compare tools side by side to make informed decisions.",
+      "For every tool, we read its official site and pricing page, and check licenses and activity on GitHub.",
   },
   {
-    icon: <BsLightningFill className="feature-icon" />,
-    title: "Real-time Data",
+    icon: LuScale,
+    title: "Compares what it can prove",
     description:
-      "Each search reads live web pages, so results reflect what tools say about their features and pricing today, with results appearing as they finish.",
+      "You get a side-by-side comparison with every source linked. Anything we couldn't confirm stays blank.",
   },
 ];
 
 const Features = () => (
-  <section id="features" className="features-section">
-    <div className="features-container">
-      <div className="features-header">
-        <h2 className="features-title">
-          Why Choose{" "}
-          <span className="features-gradient-text">Tool Scraper</span>
-        </h2>
-        <p className="features-description">
-          Discover the powerful features that make tool discovery effortless and
-          comprehensive
-        </p>
-      </div>
-      <div className="features-grid">
-        {features.map((feature, index) => (
-          <div key={index} className="feature-card">
-            <div className="feature-icon-wrapper">
-              <span className="feature-icon">{feature.icon}</span>
+  <section id="features" className="features-section section">
+    <div className="container">
+      <p className="section-eyebrow">How it works</p>
+      <h2 className="section-title">Answers you can check</h2>
+      <p className="section-lead">
+        Each search takes about 20 seconds and shows its work, so you can trust the comparison
+        or click through and verify it yourself.
+      </p>
+
+      <ol className="steps">
+        {STEPS.map(({ icon: Icon, title, description }, index) => (
+          <li key={title} className="step">
+            <div className="step-icon">
+              <Icon size={20} aria-hidden="true" />
             </div>
-            <div className="feature-content">
-              <h3 className="feature-title">{feature.title}</h3>
-              <p className="feature-description">{feature.description}</p>
-            </div>
-          </div>
+            <p className="step-number">Step {index + 1}</p>
+            <h3>{title}</h3>
+            <p className="step-description">{description}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   </section>
 );

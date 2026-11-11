@@ -9,39 +9,25 @@ const Footer = () => {
     if (window.location.pathname !== path) {
       window.history.pushState({}, "", path);
       window.dispatchEvent(new PopStateEvent("popstate"));
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
-    <footer className="app-footer">
-      <div className="footer-container">
-        <div className="footer-bottom">
-          <span className="footer-copy">
-            © {currentYear} Tool Scraper — All Rights Reserved
-          </span>
-          <nav className="footer-links">
-            <a href="/guides/" className="footer-link">
-              Tool Guides
-            </a>
-            <span className="footer-sep">•</span>
-            <a
-              href="/privacy"
-              className="footer-link"
-              onClick={(e) => navigate("/privacy", e)}
-            >
-              Privacy Policy
-            </a>
-            <span className="footer-sep">•</span>
-            <a
-              href="/terms"
-              className="footer-link"
-              onClick={(e) => navigate("/terms", e)}
-            >
-              Terms of Service
-            </a>
-          </nav>
-        </div>
+    <footer className="footer">
+      <div className="footer-inner container">
+        <span className="footer-brand">
+          <span className="brand-mark" aria-hidden="true" />© {currentYear} Tool Scraper
+        </span>
+        <nav className="footer-links" aria-label="Footer">
+          <a href="/guides/">Tool guides</a>
+          <a href="/privacy" onClick={(e) => navigate("/privacy", e)}>
+            Privacy
+          </a>
+          <a href="/terms" onClick={(e) => navigate("/terms", e)}>
+            Terms
+          </a>
+        </nav>
       </div>
     </footer>
   );

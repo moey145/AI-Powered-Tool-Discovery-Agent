@@ -4,7 +4,6 @@ import Features from "./components/Features";
 import SearchSection from "./components/SearchSection";
 import ResultsSection from "./components/ResultsSection";
 import Contact from "./components/Contact";
-import FloatingThemeToggle from "./components/FloatingThemeToggle";
 import Footer from "./components/Footer";
 import Privacy from "./components/Privacy";
 import Terms from "./components/Terms";
@@ -98,7 +97,6 @@ function App() {
             onSearch={(text) => void runSearch(text)}
             onCancel={cancel}
             loading={loading}
-            hasResults={results !== null || streamedTools.length > 0}
             loadingProgress={loadingProgress}
             loadingStage={loadingStage}
             error={error}
@@ -118,9 +116,8 @@ function App() {
   return (
     <div className="app-wrapper">
       <Navbar onSectionChange={handleSectionChange} />
-      {renderRoute()}
+      <main className="app-main">{renderRoute()}</main>
       <Footer />
-      <FloatingThemeToggle />
     </div>
   );
 }

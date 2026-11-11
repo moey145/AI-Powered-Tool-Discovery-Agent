@@ -8,3 +8,5 @@ afterEach(() => {
 });
 
 window.scrollTo = vi.fn();
+// jsdom has no layout, so it doesn't implement scrolling an element into view.
+Element.prototype.scrollIntoView = vi.fn();

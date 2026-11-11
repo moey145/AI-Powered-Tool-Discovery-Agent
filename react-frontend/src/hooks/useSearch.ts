@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, searchTools } from "../utils/api";
+import { ApiError, isAbort, searchTools } from "../utils/api";
 import type { ResearchResult, SearchError, Tool } from "../types";
 
 export const useSearch = () => {
@@ -41,7 +41,7 @@ export const useSearch = () => {
     } catch (err) {
       if (err instanceof ApiError) {
         setError({ type: err.type, message: err.message });
-      } else if (!(err instanceof Error && err.name === "AbortError")) {
+      } else if (!isAbort(err)) {
         setError({ type: "api", message: "Something went wrong. Please try again." });
       }
       return false;

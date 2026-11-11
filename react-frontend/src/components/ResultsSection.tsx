@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { LuLayoutGrid, LuSearchX, LuTable } from "react-icons/lu";
 import CompanyCard from "./CompanyCard";
 import CompareTable from "./CompareTable";
 import type { ResearchResult, Tool } from "../types";
@@ -30,18 +31,15 @@ interface ResultsSectionProps {
 const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps) => {
   const [filters, setFilters] = useState<ToolFilters>(DEFAULT_FILTERS);
   const [view, setView] = useState<"cards" | "compare">("cards");
+  const sectionRef = useRef<HTMLElement>(null);
   const companies = results?.companies ?? streamedTools;
   const hasContent = results !== null || companies.length > 0;
 
   useEffect(() => {
     if (!hasContent) return undefined;
     const timer = setTimeout(() => {
-      const section = document.querySelector(".results-section");
-      if (section) {
-        const y = section.getBoundingClientRect().top + window.scrollY - 80;
-        window.scrollTo({ top: y, behavior: "smooth" });
-      }
-    }, 100);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
     return () => clearTimeout(timer);
   }, [hasContent]);
 
@@ -51,12 +49,16 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
 
   if (results && (results.status === "no_results" || companies.length === 0)) {
     return (
-      <div className="results-section">
-        <p className="results-note">
-          We couldn't find verifiable tools for that search. Try different wording, or try again
-          in a moment.
-        </p>
-      </div>
+      <section className="results container" ref={sectionRef}>
+        <div className="results-empty">
+          <LuSearchX size={28} aria-hidden="true" />
+          <h2>No verified tools found</h2>
+          <p>
+            We couldn't find tools we could back up with sources. Try wording the search
+            differently, or try again in a moment.
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -64,63 +66,42 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
     setFilters((current) => ({ ...current, [key]: value }));
 
   const unresearched = results?.unresearched ?? [];
+  const count = (test: (tool: Tool) => boolean) => companies.filter(test).length;
+  const stats = [
+    { label: "open source", value: count((c) => c.is_open_source === true) },
+    {
+      label: "free or free tier",
+      value: count((c) => c.pricing_model === "Free" || c.pricing_model === "Freemium"),
+    },
+    { label: "actively maintained", value: count((c) => c.maintenance === "active") },
+  ];
 
   return (
-    <div className="results-section">
-      <div className="metrics-grid">
-        <div className="metric-card">
-          <div className="metric-icon">🏢</div>
-          <div className="metric-content">
-            <h3>Tools Found</h3>
-            <div className="metric-value">{companies.length}</div>
-          </div>
+    <section className="results container" ref={sectionRef} aria-labelledby="results-heading">
+      <div className="results-header">
+        <div>
+          <h2 id="results-heading">
+            {loading ? "Researching tools" : "Results"}
+            <span className="results-count">{companies.length}</span>
+          </h2>
+          <ul className="results-stats">
+            {stats.map((stat) => (
+              <li key={stat.label}>
+                <strong>{stat.value}</strong> {stat.label}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="metric-card">
-          <div className="metric-icon">📖</div>
-          <div className="metric-content">
-            <h3>Open Source</h3>
-            <div className="metric-value">
-              {companies.filter((c) => c.is_open_source).length}
-            </div>
-          </div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-icon">💰</div>
-          <div className="metric-content">
-            <h3>Free or Free Tier</h3>
-            <div className="metric-value">
-              {
-                companies.filter(
-                  (c) => c.pricing_model === "Free" || c.pricing_model === "Freemium"
-                ).length
-              }
-            </div>
-          </div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-icon">🟢</div>
-          <div className="metric-content">
-            <h3>Actively Maintained</h3>
-            <div className="metric-value">
-              {companies.filter((c) => c.maintenance === "active").length}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="companies-section">
-        <h3>
-          {loading ? "Researching tools" : "Detailed Tool Analysis"} ({companies.length})
-        </h3>
 
         {companies.length > 1 && (
           <div className="results-toolbar">
-            <div className="view-toggle" role="group" aria-label="Result layout">
+            <div className="segmented" role="group" aria-label="Result layout">
               <button
                 className={view === "cards" ? "active" : ""}
                 aria-pressed={view === "cards"}
                 onClick={() => setView("cards")}
               >
+                <LuLayoutGrid size={15} aria-hidden="true" />
                 Cards
               </button>
               <button
@@ -128,12 +109,14 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
                 aria-pressed={view === "compare"}
                 onClick={() => setView("compare")}
               >
+                <LuTable size={15} aria-hidden="true" />
                 Compare
               </button>
             </div>
-            <label>
-              Pricing
+            <label className="toolbar-field">
+              <span>Pricing</span>
               <select
+                className="field"
                 value={filters.pricing}
                 onChange={(e) => update("pricing", e.target.value as PricingFilter)}
               >
@@ -143,9 +126,10 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
                 <option value="paid">Paid</option>
               </select>
             </label>
-            <label>
-              Sort by
+            <label className="toolbar-field">
+              <span>Sort by</span>
               <select
+                className="field"
                 value={filters.sort}
                 onChange={(e) => update("sort", e.target.value as SortOrder)}
               >
@@ -155,7 +139,7 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
                 <option value="name">Name</option>
               </select>
             </label>
-            <label className="checkbox">
+            <label className="toolbar-check">
               <input
                 type="checkbox"
                 checked={filters.openSourceOnly}
@@ -165,35 +149,31 @@ const ResultsSection = ({ results, streamedTools, loading }: ResultsSectionProps
             </label>
           </div>
         )}
-
-        {unresearched.length > 0 && (
-          <p className="results-note">Couldn't verify details for: {unresearched.join(", ")}.</p>
-        )}
-
-        {visible.length === 0 ? (
-          <p className="results-note">No tools match these filters.</p>
-        ) : view === "compare" ? (
-          <CompareTable tools={visible} />
-        ) : (
-          <div className="companies-grid">
-            {visible.map((company) => (
-              <CompanyCard key={company.name} company={company} />
-            ))}
-          </div>
-        )}
       </div>
 
       {results?.analysis && (
-        <div className="recommendations-section">
-          <h3>AI Recommendations</h3>
-          <div className="recommendations-content">
-            <div className="recommendation-text" style={{ whiteSpace: "pre-line" }}>
-              {renderBold(results.analysis)}
-            </div>
-          </div>
+        <aside className="recommendation">
+          <h3>Recommendation</h3>
+          <p>{renderBold(results.analysis)}</p>
+        </aside>
+      )}
+
+      {unresearched.length > 0 && (
+        <p className="results-note">Couldn't verify details for: {unresearched.join(", ")}.</p>
+      )}
+
+      {visible.length === 0 ? (
+        <p className="results-note">No tools match these filters.</p>
+      ) : view === "compare" ? (
+        <CompareTable tools={visible} />
+      ) : (
+        <div className="tool-grid">
+          {visible.map((company) => (
+            <CompanyCard key={company.name} company={company} />
+          ))}
         </div>
       )}
-    </div>
+    </section>
   );
 };
 

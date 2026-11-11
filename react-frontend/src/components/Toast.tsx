@@ -1,6 +1,15 @@
 import { useEffect, useEffectEvent, useState } from "react";
+import type { IconType } from "react-icons";
+import { LuCircleCheck, LuCircleX, LuInfo, LuTriangleAlert, LuX } from "react-icons/lu";
 import type { ToastType } from "../contexts/useToast";
 import "./Toast.css";
+
+const ICONS: Record<ToastType, IconType> = {
+  success: LuCircleCheck,
+  warning: LuTriangleAlert,
+  info: LuInfo,
+  error: LuCircleX,
+};
 
 interface ToastProps {
   message: string;
@@ -10,17 +19,12 @@ interface ToastProps {
 }
 
 const Toast = ({ message, type = "error", duration = 5000, onClose }: ToastProps) => {
-  const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
+  const Icon = ICONS[type];
 
   const handleClose = () => {
     setIsExiting(true);
-    setTimeout(() => {
-      setIsVisible(false);
-      if (onClose) {
-        onClose();
-      }
-    }, 300); // Match CSS transition duration
+    setTimeout(() => onClose?.(), 180); // Matches the exit animation.
   };
 
   const onTimeout = useEffectEvent(handleClose);
@@ -31,61 +35,16 @@ const Toast = ({ message, type = "error", duration = 5000, onClose }: ToastProps
     return () => clearTimeout(timer);
   }, [duration]);
 
-  if (!isVisible) return null;
-
-  const getIcon = () => {
-    switch (type) {
-      case "success":
-        return "✅";
-      case "warning":
-        return "⚠️";
-      case "info":
-        return "ℹ️";
-      case "error":
-      default:
-        return "❌";
-    }
-  };
-
-  const getTitle = () => {
-    switch (type) {
-      case "success":
-        return "Success";
-      case "warning":
-        return "Warning";
-      case "info":
-        return "Info";
-      case "error":
-      default:
-        return "Error";
-    }
-  };
-
   return (
-    <div className={`toast ${type} ${isExiting ? "exiting" : ""}`}>
-      <div className="toast-content">
-        <div className="toast-icon">{getIcon()}</div>
-        <div className="toast-body">
-          <div className="toast-title">{getTitle()}</div>
-          <div className="toast-message">{message}</div>
-        </div>
-        <button
-          className="toast-close"
-          onClick={handleClose}
-          aria-label="Close notification"
-        >
-          ×
-        </button>
-      </div>
-      <div className="toast-progress">
-        <div
-          className="toast-progress-bar"
-          style={{
-            animationDuration: `${duration}ms`,
-            animationPlayState: isExiting ? "paused" : "running",
-          }}
-        />
-      </div>
+    <div
+      className={`toast toast-${type} ${isExiting ? "exiting" : ""}`}
+      role={type === "error" || type === "warning" ? "alert" : "status"}
+    >
+      <Icon className="toast-icon" size={18} aria-hidden="true" />
+      <p className="toast-message">{message}</p>
+      <button className="toast-close" onClick={handleClose} aria-label="Dismiss notification">
+        <LuX size={16} />
+      </button>
     </div>
   );
 };

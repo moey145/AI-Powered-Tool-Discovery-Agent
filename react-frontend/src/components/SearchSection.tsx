@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { LuCircleAlert, LuSearch, LuX } from "react-icons/lu";
 import { useToast } from "../contexts/useToast";
 import type { SearchError } from "../types";
 import { validateQuery } from "../utils/tools";
@@ -7,10 +8,10 @@ import "./SearchSection.css";
 const EXAMPLE_QUERIES = [
   "JavaScript testing frameworks",
   "Python web frameworks",
-  "React state management tools",
+  "React state management",
   "Vector databases",
   "Web scraping tools",
-  "C++ libraries and frameworks",
+  "C++ testing frameworks",
 ];
 
 const isTyping = (target: EventTarget | null) =>
@@ -23,7 +24,6 @@ interface SearchSectionProps {
   onSearch: (query: string) => void;
   onCancel: () => void;
   loading: boolean;
-  hasResults: boolean;
   loadingProgress: number;
   loadingStage: string;
   error: SearchError | null;
@@ -37,7 +37,6 @@ const SearchSection = ({
   onSearch,
   onCancel,
   loading,
-  hasResults,
   loadingProgress,
   loadingStage,
   error,
@@ -66,7 +65,7 @@ const SearchSection = ({
 
   useEffect(() => {
     if (error?.type === "validation") {
-      addToast(error.message, "warning", 6000);
+      addToast(error.message, "warning", 5000);
     }
   }, [error, addToast]);
 
@@ -98,118 +97,111 @@ const SearchSection = ({
   const hasFailure = error !== null && !hasValidationError;
 
   return (
-    <div className="search-hero">
-      <div className="hero-badge">
-        <span className="badge-icon" aria-hidden="true">
-          🔍
-        </span>
-        <span className="badge-text">AI-Powered Tool Discovery & Analysis</span>
-      </div>
-
-      <h1 className="hero-title">
-        Find the Perfect <span className="hero-gradient-text">Tools</span> for Your Projects
-      </h1>
-
+    <div className="hero container">
+      <p className="hero-eyebrow">AI-powered tool discovery & analysis</p>
+      <h1 className="hero-title">Find the Perfect Tools for Your Projects</h1>
       <p className="hero-description">
-        Describe what you need and get a sourced comparison of real developer tools, with pricing,
-        licenses, and maintenance status.
+        Describe what you need. We read the web and compare real developer tools on pricing,
+        licensing, and maintenance, with every source linked.
       </p>
 
-      <div className={`search-section ${!hasResults ? "standalone" : ""}`}>
-        <div className="search-container">
-          <div className={`search-input-wrapper ${hasValidationError ? "error" : ""}`}>
-            <svg
-              className="search-input-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
-              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" />
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !loading) submit();
-                if (e.key === "Escape" && query) clear();
-              }}
-              placeholder="Describe the tools you need..."
-              className={`search-input ${hasValidationError ? "error" : ""}`}
-              aria-label="Describe the tools you are looking for"
-              maxLength={200}
-              disabled={loading}
-              autoFocus={focusOnLoad}
-            />
-            {query && !loading ? (
-              <button className="search-clear" onClick={clear} aria-label="Clear search">
-                ×
-              </button>
-            ) : (
-              !loading && (
-                <kbd className="search-shortcut" title="Press / to search">
-                  /
-                </kbd>
-              )
-            )}
-          </div>
+      <form
+        className={`search-box ${hasValidationError ? "invalid" : ""} ${loading ? "busy" : ""}`}
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!loading) submit();
+        }}
+      >
+        <LuSearch className="search-box-icon" size={20} aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && query) clear();
+          }}
+          placeholder="e.g. Python web frameworks"
+          className="search-input"
+          aria-label="Describe the tools you are looking for"
+          aria-invalid={hasValidationError}
+          maxLength={200}
+          disabled={loading}
+          autoFocus={focusOnLoad}
+        />
+        {query && !loading ? (
+          <button type="button" className="icon-button search-clear" onClick={clear} aria-label="Clear search">
+            <LuX size={18} />
+          </button>
+        ) : (
+          !loading && (
+            <kbd className="search-shortcut" title="Press / to search">
+              /
+            </kbd>
+          )
+        )}
+        {/* Distinct keys keep these as separate elements. If React reused one <button> and
+            flipped its type to "submit" mid-click, the Cancel click would submit a new search. */}
+        {loading ? (
+          <button
+            key="cancel"
+            type="button"
+            onClick={onCancel}
+            className="btn btn-secondary search-submit"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button key="submit" type="submit" className="btn btn-primary search-submit">
+            Search
+          </button>
+        )}
+      </form>
 
-          {loading ? (
-            <button onClick={onCancel} className="search-button cancel">
-              Cancel
-            </button>
-          ) : (
-            <button onClick={submit} disabled={!query.trim()} className="search-button">
-              Research Topic
-            </button>
-          )}
+      {loading && (
+        <div className="search-progress" role="status" aria-live="polite">
+          <div className="search-progress-track">
+            <div className="search-progress-fill" style={{ width: `${loadingProgress}%` }} />
+          </div>
+          <div className="search-progress-label">
+            <span>{loadingStage}</span>
+            <span>{Math.round(loadingProgress)}%</span>
+          </div>
         </div>
+      )}
 
-        {loading && (
-          <div className="search-progress" role="status" aria-live="polite">
-            <div className="search-progress-label">
-              <span>{loadingStage}</span>
-              <span>{Math.round(loadingProgress)}%</span>
-            </div>
-            <div className="search-progress-track">
-              <div className="search-progress-fill" style={{ width: `${loadingProgress}%` }} />
-            </div>
-          </div>
-        )}
+      {hasFailure && (
+        <div className="search-failure" role="alert">
+          <LuCircleAlert size={18} aria-hidden="true" />
+          <span>{error.message}</span>
+          <button type="button" className="btn btn-secondary" onClick={submit}>
+            Try again
+          </button>
+        </div>
+      )}
 
-        {hasFailure && (
-          <div className="search-failure" role="alert">
-            <span>{error.message}</span>
-            <button onClick={submit}>Try again</button>
-          </div>
-        )}
+      {!loading && (
+        <div className="suggestions">
+          <span className="suggestions-label">Try</span>
+          {EXAMPLE_QUERIES.map((example) => (
+            <button key={example} type="button" className="chip" onClick={() => search(example)}>
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
 
-        {!loading && (
-          <div className="example-queries">
-            <span className="example-label">Try:</span>
-            {EXAMPLE_QUERIES.map((example) => (
-              <button key={example} className="example-query" onClick={() => search(example)}>
-                {example}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!loading && recentSearches.length > 0 && (
-          <div className="recent-searches">
-            <span>Recent:</span>
-            {recentSearches.map((recent) => (
-              <button key={recent} onClick={() => search(recent)}>
-                {recent}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {!loading && recentSearches.length > 0 && (
+        <div className="suggestions recent">
+          <span className="suggestions-label">Recent</span>
+          {recentSearches.map((recent) => (
+            <button key={recent} type="button" className="chip chip-quiet" onClick={() => search(recent)}>
+              {recent}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
